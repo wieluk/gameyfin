@@ -11,6 +11,10 @@ jobs:
   sonar:
     name: Sonar Analysis
     runs-on: ubuntu-latest
+    # SonarCloud holds the token and the project under the upstream organisation, so on a
+    # fork this can only ever fail. Skipped rather than deleted, to keep the diff to
+    # upstream empty if this file is ever compared.
+    if: github.repository == 'gameyfin/gameyfin'
 
     steps:
       - name: Checkout code
