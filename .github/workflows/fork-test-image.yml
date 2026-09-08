@@ -24,6 +24,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # The test-report step creates a check run.
+      checks: write
 
     steps:
       - name: Check out the branch being built
@@ -39,6 +41,31 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
+
+      # A production build refuses to run unless the bundled plugins can be signed, and the
+      # keystore password is an upstream secret no fork has. Both halves of the trust chain
+      # are in the tree though: the keystore that signs, and the certificate the server
+      # checks against. Replacing both with a throwaway pair keeps them consistent, so the
+      # plugins in this image verify as official and start on their own.
+      #
+      # The pair lives only on the runner. Never commit it, and do not mix plugin jars
+      # between an image built this way and an official one: neither will trust the other.
+      - name: Generate a throwaway plugin signing key
+        run: |
+          set -euo pipefail
+          password="$(openssl rand -base64 24)"
+          rm -f certs/gameyfin.jks
+          keytool -genkeypair -noprompt \
+            -keystore certs/gameyfin.jks -alias gameyfin-plugins \
+            -storepass "$password" -keypass "$password" \
+            -dname "CN=Gameyfin Fork Test Build, O=Unofficial" \
+            -keyalg RSA -keysize 2048 -validity 370
+          keytool -exportcert -rfc \
+            -keystore certs/gameyfin.jks -alias gameyfin-plugins \
+            -storepass "$password" \
+            > app/src/main/resources/certificates/gameyfin-plugins.pem
+          echo "::add-mask::$password"
+          echo "GAMEYFIN_KEYSTORE_PASSWORD=$password" >> "$GITHUB_ENV"
 
       # The Dockerfile copies a prebuilt jar rather than compiling, so this has to run first.
       - name: Run production build
