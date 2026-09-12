@@ -184,6 +184,46 @@ sealed class ConfigProperties<T : Serializable>(
         )
     }
 
+    /** Save sync */
+    sealed class SaveSync {
+        data object Enabled : ConfigProperties<Boolean>(
+            Boolean::class,
+            "save-sync.enabled",
+            "Enable game save synchronization",
+            "When enabled, clients can upload and download game saves. While disabled, the save endpoints reject every request.",
+            false
+        )
+
+        data object MaxSizeMb : ConfigProperties<Int>(
+            Int::class,
+            "save-sync.max-size-mb",
+            "Maximum size of a single save in Megabytes (MB)",
+            "Uploads larger than this are rejected. Keep it comfortably above the largest save you expect.",
+            500,
+            min = 1,
+            max = 10_000
+        )
+
+        data object MaxVersionsPerGame : ConfigProperties<Int>(
+            Int::class,
+            "save-sync.max-versions-per-game",
+            "Number of save versions to keep per game",
+            "Once a user exceeds this many versions of one game, the oldest are deleted. Versions marked as kept are never deleted automatically.",
+            10,
+            min = 1,
+            max = 100
+        )
+
+        data object MaxTotalPerUserMb : ConfigProperties<Int>(
+            Int::class,
+            "save-sync.max-total-per-user-mb",
+            "Maximum total save storage per user in Megabytes (MB)",
+            "The combined size of all of a user's saves. Uploads that would exceed it are rejected.",
+            10_240,
+            min = 1
+        )
+    }
+
     /** User management */
     sealed class Users {
         sealed class SignUps {
