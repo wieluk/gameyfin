@@ -2,12 +2,20 @@ import {createPortal} from "react-dom";
 import {RefCallback, useState} from "react";
 import {Button, Link} from "@heroui/react";
 import {NavLink, useLocation, useNavigate} from "react-router";
-import {ArrowLeftIcon, HouseIcon, ListIcon, MagnifyingGlassIcon, ShootingStarIcon} from "@phosphor-icons/react";
+import {
+    ArrowLeftIcon,
+    CloudArrowUpIcon,
+    HouseIcon,
+    ListIcon,
+    MagnifyingGlassIcon,
+    ShootingStarIcon
+} from "@phosphor-icons/react";
 import GameyfinLogo from "Frontend/components/theming/GameyfinLogo";
 import SearchBar from "Frontend/components/general/SearchBar";
 import {useProfileActions} from "./useProfileActions";
 import NavigationDrawer from "./NavigationDrawer";
 import {useAuth} from "Frontend/util/auth";
+import {useSaveSyncEnabled} from "Frontend/util/saveSync";
 
 export default function CompactNavigation({searchValue, onSearchChange, sectionMenuRef}: {
     sectionMenuRef: RefCallback<HTMLDivElement>;
@@ -20,6 +28,7 @@ export default function CompactNavigation({searchValue, onSearchChange, sectionM
     const navigate = useNavigate();
     const auth = useAuth();
     const actions = useProfileActions();
+    const saveSyncEnabled = useSaveSyncEnabled();
     const [open, setOpen] = useState(false);
     const home = location.pathname === "/";
     const destinations = [
@@ -58,6 +67,13 @@ export default function CompactNavigation({searchValue, onSearchChange, sectionM
         <NavigationDrawer title="More" open={open} onOpenChange={setOpen}>
             <div className="flex flex-col gap-2">
                 {auth.state.user && <p className="text-muted wrap-anywhere">Signed in as {auth.state.user.username}</p>}
+                {/* The bottom bar has four fixed slots, so Saves lives here on small screens. */}
+                {saveSyncEnabled && <Button variant="ghost" className="w-full justify-start"
+                                            aria-current={location.pathname.startsWith("/cloud-saves") ? "page" : undefined}
+                                            onPress={() => {
+                                                setOpen(false);
+                                                navigate("/cloud-saves");
+                                            }}><CloudArrowUpIcon weight="fill"/>Saves</Button>}
                 {actions.map(action => <Button key={action.label}
                                                aria-current={action.path && location.pathname.startsWith(action.path) ? "page" : undefined}
                                                variant="ghost"
