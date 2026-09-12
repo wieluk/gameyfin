@@ -4,6 +4,7 @@ import {useNavigate, useParams} from "react-router";
 import {GameCover} from "Frontend/components/general/covers/GameCover";
 import ComboButton, {ComboButtonOption} from "Frontend/components/general/input/ComboButton";
 import ImageCarousel from "Frontend/components/general/covers/ImageCarousel";
+import GameSaves from "Frontend/components/general/GameSaves";
 import {Accordion, AccordionItem, addToast, Button, Chip, Link, Tooltip, useDisclosure} from "@heroui/react";
 import {humanFileSize, isAdmin, starRatingAsString} from "Frontend/util/utils";
 import {DownloadEndpoint} from "Frontend/endpoints/endpoints";
@@ -320,6 +321,7 @@ export default function GameView() {
                             </table>
                         </div>
                     </div>
+                    <GameSaves gameId={game.id}/>
                     <div className="flex flex-col gap-4">
                         <p className="text-default-500">Media</p>
                         <ImageCarousel
