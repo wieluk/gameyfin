@@ -1,4 +1,5 @@
 import {
+    CloudArrowUpIcon,
     DownloadSimpleIcon,
     EnvelopeIcon,
     GameControllerIcon,
@@ -28,6 +29,11 @@ const menuItems: MenuItem[] = [
         title: "Downloads",
         url: "downloads",
         icon: <DownloadSimpleIcon/>
+    },
+    {
+        title: "Save Sync",
+        url: "save-sync",
+        icon: <CloudArrowUpIcon/>
     },
     {
         title: "Users",
