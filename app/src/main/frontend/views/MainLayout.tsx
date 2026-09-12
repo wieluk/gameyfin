@@ -5,8 +5,10 @@ import GameyfinLogo from "Frontend/components/theming/GameyfinLogo";
 import * as PackageJson from "../../../../package.json";
 import {Outlet, useLocation, useNavigate} from "react-router";
 import {useAuth} from "Frontend/util/auth";
+import {useSaveSyncEnabled} from "Frontend/util/saveSync";
 import {
     ArrowLeftIcon,
+    CloudArrowUpIcon,
     DiceSixIcon,
     DiscIcon,
     HeartIcon,
@@ -34,6 +36,7 @@ export default function MainLayout() {
     const isSearchPage = location.pathname.startsWith("/search");
     const isHomePage = location.pathname === "/";
     const [isExploding, setIsExploding] = useState(false);
+    const saveSyncEnabled = useSaveSyncEnabled();
     const games = useSnapshot(gameState).games;
     const {stickyHeader} = useSnapshot(layoutState);
 
@@ -127,6 +130,23 @@ export default function MainLayout() {
                     )}
 
                     <ul className="flex items-center gap-2 ml-auto">
+                        {saveSyncEnabled && (
+                            <li>
+                                <Tooltip>
+                                    <Tooltip.Trigger>
+                                        <Button
+                                            variant="secondary"
+                                            isDisabled={location.pathname.startsWith("/cloud-saves")}
+                                            onPress={() => navigate("/cloud-saves")}
+                                        >
+                                            <CloudArrowUpIcon weight="fill"/>
+                                            Saves
+                                        </Button>
+                                    </Tooltip.Trigger>
+                                    <Tooltip.Content placement="bottom">Your synced game saves</Tooltip.Content>
+                                </Tooltip>
+                            </li>
+                        )}
                         <li>
                             <Tooltip>
                                 <Tooltip.Trigger>
