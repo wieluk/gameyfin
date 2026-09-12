@@ -8,7 +8,9 @@ interface GameMetadataDto {
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class GameMetadataUserDto(
-    override val fileSize: Long
+    override val fileSize: Long,
+    /** Plugin id to that provider's own id, e.g. the Steam AppID. Public catalogue identifiers. */
+    val originalIds: Map<String, String>? = null
 ) : GameMetadataDto
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
