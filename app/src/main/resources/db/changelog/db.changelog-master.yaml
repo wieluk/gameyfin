@@ -1722,3 +1722,7 @@ databaseChangeLog:
         - dropColumn:
             tableName: GAME
             columnName: IS_DIRECTORY
+
+  - include:
+      file: db.changelog-fork-save-sync.yaml
+      relativeToChangelogFile: true
