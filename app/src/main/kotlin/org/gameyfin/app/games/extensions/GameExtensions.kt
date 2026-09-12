@@ -166,7 +166,8 @@ fun GameMetadata.toAdminDto(): GameMetadataAdminDto {
 
 fun GameMetadata.toUserDto(): GameMetadataUserDto {
     return GameMetadataUserDto(
-        fileSize = this.fileSize ?: 0L
+        fileSize = this.fileSize ?: 0L,
+        originalIds = this.originalIds.mapKeys { it.key.pluginId }
     )
 }
 

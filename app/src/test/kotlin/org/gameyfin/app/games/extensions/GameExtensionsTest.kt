@@ -263,7 +263,26 @@ class GameExtensionsTest {
     }
 
     @Test
-    fun `GameMetadata toUserDto should only include fileSize`() {
+    fun `GameMetadata toUserDto should include fileSize and external IDs`() {
+        val pluginEntry = mockk<PluginManagementEntry> {
+            every { pluginId } returns "test-plugin"
+        }
+        val metadata = org.gameyfin.app.games.entities.GameMetadata(
+            path = "/test/path",
+            fileSize = 2000L,
+            downloadCount = 10,
+            matchConfirmed = false,
+            originalIds = mapOf(pluginEntry to "ext-123")
+        )
+
+        val result = metadata.toUserDto()
+
+        assertEquals(2000L, result.fileSize)
+        assertEquals(mapOf("test-plugin" to "ext-123"), result.originalIds)
+    }
+
+    @Test
+    fun `GameMetadata toUserDto should not leak the path or download count`() {
         val metadata = org.gameyfin.app.games.entities.GameMetadata(
             path = "/test/path",
             fileSize = 2000L,
@@ -274,6 +293,7 @@ class GameExtensionsTest {
         val result = metadata.toUserDto()
 
         assertEquals(2000L, result.fileSize)
+        assertEquals(emptyMap(), result.originalIds)
     }
 
     @Test
