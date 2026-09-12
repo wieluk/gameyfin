@@ -8,7 +8,8 @@ interface GameMetadataDto {
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class GameMetadataUserDto(
-    override val fileSize: Long
+    override val fileSize: Long,
+    val originalIds: Map<String, String>? = null
 ) : GameMetadataDto
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
