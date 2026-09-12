@@ -10,7 +10,8 @@ interface GameMetadataDto {
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class GameMetadataUserDto(
     override val fileSize: Long,
-    override val directory: Boolean? = null
+    override val directory: Boolean? = null,
+    val originalIds: Map<String, String>? = null
 ) : GameMetadataDto
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
