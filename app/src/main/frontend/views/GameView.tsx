@@ -5,6 +5,7 @@ import {useNavigate, useParams} from "react-router";
 import {GameCover} from "Frontend/components/general/covers/GameCover";
 import GameDownloadButtons from "Frontend/components/general/input/GameDownloadButtons";
 import ImageCarousel from "Frontend/components/general/covers/ImageCarousel";
+import GameSaves from "Frontend/components/general/GameSaves";
 import BlurhashImage from "Frontend/components/general/covers/BlurhashImage";
 import {Button, Chip, Link, Surface, Tooltip, useOverlayState} from "@heroui/react";
 import {isAdmin, starRatingAsString} from "Frontend/util/utils";
@@ -343,6 +344,7 @@ export default function GameView() {
                             </table>
                         </div>
                     </div>
+                    <GameSaves gameId={game.id}/>
                     <div className="flex flex-col gap-4">
                         <p className="text-muted">Media</p>
                         <ImageCarousel

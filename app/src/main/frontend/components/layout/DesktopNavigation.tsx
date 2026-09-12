@@ -3,6 +3,7 @@ import {redirectToLogin} from "Frontend/util/login";
 import {useLocation, useNavigate} from "react-router";
 import {
     ArrowLeftIcon,
+    CloudArrowUpIcon,
     DiceSixIcon,
     HouseIcon,
     ListMagnifyingGlassIcon,
@@ -16,6 +17,7 @@ import ProfileMenu from "Frontend/components/ProfileMenu";
 import NotificationPopover from "Frontend/components/general/NotificationPopover";
 import {useAuth} from "Frontend/util/auth";
 import {isAdmin} from "Frontend/util/utils";
+import {useSaveSyncEnabled} from "Frontend/util/saveSync";
 
 export default function DesktopNavigation({randomGame, hasGames, searchValue, onSearchChange}: {
     randomGame: () => void;
@@ -26,6 +28,7 @@ export default function DesktopNavigation({randomGame, hasGames, searchValue, on
     const location = useLocation();
     const navigate = useNavigate();
     const auth = useAuth();
+    const saveSyncEnabled = useSaveSyncEnabled();
     const isHomePage = location.pathname === "/";
     const isSearchPage = location.pathname.startsWith("/search");
     return (
@@ -74,6 +77,23 @@ export default function DesktopNavigation({randomGame, hasGames, searchValue, on
             )}
 
             <ul className="flex flex-1 items-center justify-end gap-2">
+                {saveSyncEnabled && (
+                    <li>
+                        <Tooltip>
+                            <Tooltip.Trigger>
+                                <Button
+                                    variant="secondary"
+                                    isDisabled={location.pathname.startsWith("/cloud-saves")}
+                                    onPress={() => navigate("/cloud-saves")}
+                                >
+                                    <CloudArrowUpIcon weight="fill"/>
+                                    Saves
+                                </Button>
+                            </Tooltip.Trigger>
+                            <Tooltip.Content placement="bottom">Your synced game saves</Tooltip.Content>
+                        </Tooltip>
+                    </li>
+                )}
                 <li>
                     <Tooltip>
                         <Tooltip.Trigger>
