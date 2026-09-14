@@ -180,7 +180,7 @@ export default function CloudSavesView() {
 
             {viewingSomeoneElse &&
                 <p className="text-sm text-warning-600">
-                    Viewing another user's saves. You can delete them, but not download them.
+                    Viewing another user's saves.
                 </p>
             }
 
@@ -211,7 +211,6 @@ export default function CloudSavesView() {
                             <div className="flex flex-col gap-2">
                                 <SaveVersionsTable saves={group.versions}
                                                    label={`Save versions for ${group.gameTitle}`}
-                                                   showDownload={!viewingSomeoneElse}
                                                    onChange={reload}/>
                                 <Button className="self-end" size="sm" color="danger" variant="light"
                                         startContent={<TrashIcon/>}

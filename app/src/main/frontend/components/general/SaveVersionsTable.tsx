@@ -8,11 +8,10 @@ import {humanFileSize, timeUntil} from "Frontend/util/utils";
 interface SaveVersionsTableProps {
     saves: GameSaveDto[];
     label: string;
-    showDownload?: boolean;
     onChange: () => Promise<void> | void;
 }
 
-export default function SaveVersionsTable({saves, label, showDownload = true, onChange}: SaveVersionsTableProps) {
+export default function SaveVersionsTable({saves, label, onChange}: SaveVersionsTableProps) {
     async function remove(save: GameSaveDto) {
         await SaveSyncEndpoint.deleteSaves([save.id]);
         await onChange();
@@ -41,15 +40,12 @@ export default function SaveVersionsTable({saves, label, showDownload = true, on
                         <TableCell><Chip size="sm" variant="flat">{save.platform}</Chip></TableCell>
                         <TableCell>
                             <div className="flex flex-row gap-2 justify-end">
-                                {/* Download URLs need a game id */}
-                                {showDownload && save.gameId !== undefined &&
-                                    <Tooltip content="Download this version">
-                                        <Button size="sm" isIconOnly variant="light"
-                                                onPress={() => SaveArchiveEndpoint.downloadSave(save.gameId!, save.id)}>
-                                            <DownloadSimpleIcon/>
-                                        </Button>
-                                    </Tooltip>
-                                }
+                                <Tooltip content="Download this version">
+                                    <Button size="sm" isIconOnly variant="light"
+                                            onPress={() => SaveArchiveEndpoint.downloadSave(save.id)}>
+                                        <DownloadSimpleIcon/>
+                                    </Button>
+                                </Tooltip>
                                 <Tooltip
                                     content={save.locked ? "Allow this version to be cleaned up" : "Keep this version forever"}>
                                     <Button size="sm" isIconOnly variant="light" onPress={() => toggleLock(save)}>

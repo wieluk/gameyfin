@@ -21,13 +21,17 @@ class GameSave(
     // Nullable: scans delete games whose folder is missing, e.g. on an unmounted share
     @ManyToOne(fetch = FetchType.EAGER)
     @OnDelete(action = OnDeleteAction.SET_NULL)
-    val game: Game?,
+    var game: Game?,
 
     // Kept so the save can be shown and relinked after its game is deleted
     val gameTitle: String? = null,
 
     @Column(nullable = false)
-    val gamePath: String,
+    var gamePath: String,
+
+    // One "pluginId=originalId" per line, so the game is recognized when re-added under another folder
+    @Column(length = 1024)
+    var gameProviderIds: String? = null,
 
     // Server-generated file name, never client input
     @Column(nullable = false)

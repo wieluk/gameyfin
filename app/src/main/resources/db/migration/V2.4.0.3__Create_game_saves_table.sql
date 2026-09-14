@@ -3,7 +3,8 @@
 -- Context: One row per uploaded save version. The archive bytes live on disk under the
 --          file storage root and are referenced by CONTENT_ID; only metadata is stored here.
 --          A save outlives its game: library scans delete games whose folder is missing, so
---          GAME_ID is cleared rather than cascaded, and GAME_PATH lets a re-added game claim it back.
+--          GAME_ID is cleared rather than cascaded. GAME_PATH and GAME_PROVIDER_IDS let the game claim
+--          it back when it is re-added, also under a different folder.
 
 CREATE SEQUENCE GAME_SAVE_SEQ INCREMENT BY 50;
 
@@ -15,6 +16,7 @@ CREATE TABLE GAME_SAVE
     GAME_ID         BIGINT,
     GAME_TITLE      CHARACTER VARYING(255),
     GAME_PATH       CHARACTER VARYING(255)   NOT NULL,
+    GAME_PROVIDER_IDS CHARACTER VARYING(1024),
     CONTENT_ID      CHARACTER VARYING(255)   NOT NULL,
     CONTENT_LENGTH  BIGINT                   NOT NULL,
     CONTENT_HASH    CHARACTER VARYING(64)    NOT NULL,
