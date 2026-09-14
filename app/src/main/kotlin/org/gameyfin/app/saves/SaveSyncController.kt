@@ -17,7 +17,7 @@ import java.io.InputStream
 
 // Plain MVC because Hilla RPC is JSON only
 @RestController
-@RequestMapping("/saves/game/{gameId}")
+@RequestMapping("/saves")
 class SaveSyncController(
     private val gameSaveService: GameSaveService,
     private val gameService: GameService
@@ -25,31 +25,22 @@ class SaveSyncController(
 
     data class ConflictResponse(val remote: GameSaveDto, val baseSaveId: Long?)
 
-    @GetMapping
+    @GetMapping("/game/{gameId}")
     fun listVersions(@PathVariable gameId: Long): ResponseEntity<List<GameSaveDto>> = withUser { user ->
         ResponseEntity.ok(gameSaveService.list(user.id!!, gameId).map { it.toDto() })
     }
 
-    @GetMapping("/{saveId}")
+    @GetMapping("/game/{gameId}/{saveId}")
     fun downloadVersion(@PathVariable gameId: Long, @PathVariable saveId: Long): ResponseEntity<Resource> =
-        withUser { user ->
-            // Owner only, even for admins: saves can contain personal data
-            val save = find(gameId, saveId)?.takeIf { it.user.id == user.id }
-            val archive = save?.let { gameSaveService.archivePath(it) }
-                ?: return@withUser ResponseEntity.notFound().build()
+        withUser { user -> serve(find(gameId, saveId), user) }
 
-            ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .contentLength(save.contentLength)
-                .eTag(save.contentHash)
-                // Same origin as the app, so the browser must never render it
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"save-${save.id}.zip\"")
-                .header("X-Content-Type-Options", "nosniff")
-                .body(FileSystemResource(archive))
-        }
+    // No game id, so saves of games that left the library can be downloaded too
+    @GetMapping("/{saveId}")
+    fun download(@PathVariable saveId: Long): ResponseEntity<Resource> =
+        withUser { user -> serve(gameSaveService.byId(saveId), user) }
 
     // Raw body, not multipart, so the size limit applies while streaming
-    @PostMapping(consumes = ["application/zip"])
+    @PostMapping("/game/{gameId}", consumes = ["application/zip"])
     fun upload(
         @PathVariable gameId: Long,
         body: InputStream,
@@ -89,7 +80,7 @@ class SaveSyncController(
         }
     }
 
-    @DeleteMapping("/{saveId}")
+    @DeleteMapping("/game/{gameId}/{saveId}")
     fun deleteVersion(@PathVariable gameId: Long, @PathVariable saveId: Long): ResponseEntity<Void> = withUser { user ->
         val save = find(gameId, saveId)?.takeIf { gameSaveService.canManage(it, user) }
             ?: return@withUser ResponseEntity.notFound().build()
@@ -102,6 +93,21 @@ class SaveSyncController(
         if (!gameSaveService.enabled()) return disabled()
         val user = gameSaveService.currentUser() ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
         return block(user)
+    }
+
+    // Same rule as delete: the owner, or a role above the owner's
+    private fun serve(save: GameSave?, user: User): ResponseEntity<Resource> {
+        val allowed = save?.takeIf { gameSaveService.canManage(it, user) }
+        val archive = allowed?.let { gameSaveService.archivePath(it) } ?: return ResponseEntity.notFound().build()
+
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .contentLength(allowed.contentLength)
+            .eTag(allowed.contentHash)
+            // Same origin as the app, so the browser must never render it
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"save-${allowed.id}.zip\"")
+            .header("X-Content-Type-Options", "nosniff")
+            .body(FileSystemResource(archive))
     }
 
     // 404 instead of 403, so save ids can't be probed

@@ -191,7 +191,7 @@ export default function CloudSavesView() {
 
             {viewingSomeoneElse &&
                 <p className="text-sm text-warning">
-                    Viewing another user's saves. You can delete them, but not download them.
+                    Viewing another user's saves.
                 </p>
             }
 
@@ -226,7 +226,6 @@ export default function CloudSavesView() {
                                 <Accordion.Body className="flex flex-col gap-2">
                                     <SaveVersionsTable saves={group.versions}
                                                        label={`Save versions for ${group.gameTitle}`}
-                                                       showDownload={!viewingSomeoneElse}
                                                        onChange={reload}/>
                                     <Button className="self-end" size="sm" variant="danger-soft"
                                             onPress={() => setPendingDeletion({
