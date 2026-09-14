@@ -4,6 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.gameyfin.app.config.ConfigProperties
 import org.gameyfin.app.config.ConfigService
 import org.gameyfin.app.core.events.GameCreatedEvent
+import org.gameyfin.app.core.events.GameDeletedEvent
 import org.gameyfin.app.core.events.UserDeletedEvent
 import org.gameyfin.app.core.security.getCurrentAuth
 import org.gameyfin.app.games.entities.Game
@@ -66,6 +67,7 @@ class GameSaveService(
     companion object {
         private val ZIP_MAGIC = byteArrayOf(0x50, 0x4B, 0x03, 0x04)
         private const val MAX_TEXT_LENGTH = 255
+        private const val MAX_PROVIDER_IDS_LENGTH = 1024
         private const val BYTES_PER_MB = 1024L * 1024L
     }
 
@@ -96,7 +98,7 @@ class GameSaveService(
 
     fun currentUser(): User? = getCurrentAuth()?.let { userService.getByUsername(it.name) }
 
-    // Downloads stay owner-only
+    // The owner, or a role above the owner's
     fun canManage(save: GameSave, user: User): Boolean = save.user.id == user.id || userService.canManage(save.user)
 
     fun archivePath(save: GameSave): Path? {
@@ -150,13 +152,57 @@ class GameSaveService(
         savesRoot.resolve("${event.user.id}").toFile().deleteRecursively()
     }
 
-    // A game re-added at the same path (e.g. after remounting a share) gets its saves back
+    // A game re-added at the same path (remounted share) or with the same provider id (new folder) gets its saves back
     @TransactionalEventListener(fallbackExecution = true)
     fun onGameCreated(event: GameCreatedEvent) {
-        val path = event.game.metadata.path
-        val relinked = newTransaction.execute { gameSaveRepository.relinkOrphans(event.game, path) }
-        if (relinked > 0) log.info { "Relinked $relinked saves to game ${event.game.id} at $path" }
+        val game = event.game
+        val providerIds = providerIds(game)
+        newTransaction.executeWithoutResult {
+            val matching = gameSaveRepository.findByGameIsNull().filter { save ->
+                save.gamePath == game.metadata.path || parseProviderIds(save.gameProviderIds).any { it in providerIds }
+            }
+            relink(matching, game)
+        }
     }
+
+    // Scans add the new copy of a game before deleting the old one, so onGameCreated can't catch that case
+    @TransactionalEventListener(fallbackExecution = true)
+    fun onGameDeleted(event: GameDeletedEvent) {
+        newTransaction.executeWithoutResult {
+            gameSaveRepository.findByGameIsNull()
+                .filter { it.gamePath == event.game.metadata.path }
+                .groupBy { it.gameProviderIds }
+                .forEach { (providerIds, saves) -> findReplacement(providerIds)?.let { relink(saves, it) } }
+        }
+    }
+
+    // Null unless exactly one game matches, e.g. not when two editions share an id
+    private fun findReplacement(providerIds: String?): Game? =
+        parseProviderIds(providerIds)
+            .flatMap { gameSaveRepository.findGameIdsByProviderId(it.substringBefore('='), it.substringAfter('=')) }
+            .distinct()
+            .singleOrNull()
+            ?.let { gameSaveRepository.findGameById(it) }
+
+    private fun relink(saves: List<GameSave>, game: Game) {
+        if (saves.isEmpty()) return
+        saves.forEach {
+            it.game = game
+            it.gamePath = game.metadata.path
+            it.gameProviderIds = encodeProviderIds(game)
+        }
+        gameSaveRepository.saveAll(saves)
+        log.info { "Relinked saves ${saves.map { it.id }} to game ${game.id} at ${game.metadata.path}" }
+    }
+
+    private fun providerIds(game: Game): Set<String> =
+        game.metadata.originalIds.map { (plugin, id) -> "${plugin.pluginId}=$id" }.toSet()
+
+    private fun encodeProviderIds(game: Game): String? =
+        providerIds(game).sorted().joinToString("\n").takeIf { it.isNotEmpty() && it.length <= MAX_PROVIDER_IDS_LENGTH }
+
+    private fun parseProviderIds(raw: String?): Set<String> =
+        raw?.lines()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
     private fun persist(user: User, game: Game, file: Path, hash: String, metadata: SaveUploadMetadata): StoreResult {
         val userId = user.id!!
@@ -176,6 +222,7 @@ class GameSaveService(
                 game = game,
                 gameTitle = game.title?.take(MAX_TEXT_LENGTH),
                 gamePath = game.metadata.path,
+                gameProviderIds = encodeProviderIds(game),
                 contentId = file.name,
                 contentLength = size,
                 contentHash = hash,
