@@ -6,7 +6,7 @@ databaseChangeLog:
       author: wieluk
       comment: >
         Save synchronization: one row per uploaded save version, the archive itself lives in the file storage.
-        A save outlives its game (GAME_ID is cleared), GAME_PATH lets a re-added game claim it back.
+        A save outlives its game (GAME_ID is cleared), GAME_PATH and GAME_PROVIDER_IDS let the game claim it back.
         Fork changesets stay behind the upstream ones of the release they were merged into, and later upstream
         changesets go after them, so backups of older fork versions remain restorable.
         Installations that created the table with the former Flyway migration V2.4.0.3 mark this as ran.
@@ -49,6 +49,9 @@ databaseChangeLog:
                   type: varchar(255)
                   constraints:
                     nullable: false
+              - column:
+                  name: GAME_PROVIDER_IDS
+                  type: varchar(1024)
               - column:
                   name: CONTENT_ID
                   type: varchar(255)

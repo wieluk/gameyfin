@@ -43,7 +43,10 @@ class SaveSyncControllerTest {
 
         every { gameSaveService.enabled() } returns true
         every { gameSaveService.currentUser() } returns alice
+        every { gameSaveService.canManage(any(), alice) } answers { firstArg<GameSave>().user.id == alice.id }
     }
+
+    private fun archive(): Path = tempDir.resolve("blob").also { Files.write(it, byteArrayOf(0x50, 0x4B, 0x03, 0x04)) }
 
     @AfterEach
     fun tearDown() {
@@ -81,6 +84,7 @@ class SaveSyncControllerTest {
 
         assertEquals(HttpStatus.METHOD_NOT_ALLOWED, controller.listVersions(42L).statusCode)
         assertEquals(HttpStatus.METHOD_NOT_ALLOWED, controller.downloadVersion(42L, 1L).statusCode)
+        assertEquals(HttpStatus.METHOD_NOT_ALLOWED, controller.download(1L).statusCode)
         assertEquals(HttpStatus.METHOD_NOT_ALLOWED, controller.deleteVersion(42L, 1L).statusCode)
         assertEquals(HttpStatus.METHOD_NOT_ALLOWED, upload().statusCode)
     }
@@ -108,15 +112,30 @@ class SaveSyncControllerTest {
         every { gameSaveService.byId(9L) } returns save(9L, owner = bob)
 
         assertEquals(HttpStatus.NOT_FOUND, controller.downloadVersion(42L, 9L).statusCode)
+        assertEquals(HttpStatus.NOT_FOUND, controller.download(9L).statusCode)
     }
 
     @Test
-    fun `an admin cannot download someone else's save either`() {
+    fun `a stronger role can download someone else's save`() {
         val bobsSave = save(9L, owner = bob)
         every { gameSaveService.byId(9L) } returns bobsSave
         every { gameSaveService.canManage(bobsSave, alice) } returns true
+        every { gameSaveService.archivePath(bobsSave) } returns archive()
 
-        assertEquals(HttpStatus.NOT_FOUND, controller.downloadVersion(42L, 9L).statusCode)
+        assertEquals(HttpStatus.OK, controller.downloadVersion(42L, 9L).statusCode)
+        assertEquals(HttpStatus.OK, controller.download(9L).statusCode)
+    }
+
+    @Test
+    fun `a save whose game left the library can be downloaded by its id`() {
+        val orphan = GameSave(
+            id = 3L, user = alice, game = null, gamePath = "/games/Celeste",
+            contentId = "blob-3", contentLength = 4L, contentHash = "a".repeat(64)
+        )
+        every { gameSaveService.byId(3L) } returns orphan
+        every { gameSaveService.archivePath(orphan) } returns archive()
+
+        assertEquals(HttpStatus.OK, controller.download(3L).statusCode)
     }
 
     @Test

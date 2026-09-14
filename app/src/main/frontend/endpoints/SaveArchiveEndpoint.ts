@@ -1,3 +1,3 @@
-export function downloadSave(gameId: number, saveId: number) {
-    window.open(`/saves/game/${gameId}/${saveId}`, '_top');
+export function downloadSave(saveId: number) {
+    window.open(`/saves/${saveId}`, '_top');
 }
