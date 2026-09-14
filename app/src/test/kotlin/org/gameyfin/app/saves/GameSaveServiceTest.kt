@@ -4,6 +4,8 @@ import io.mockk.*
 import org.gameyfin.app.config.ConfigProperties
 import org.gameyfin.app.config.ConfigService
 import org.gameyfin.app.core.events.GameCreatedEvent
+import org.gameyfin.app.core.events.GameDeletedEvent
+import org.gameyfin.app.core.plugins.management.PluginManagementEntry
 import org.gameyfin.app.core.events.UserDeletedEvent
 import org.gameyfin.app.games.entities.Game
 import org.gameyfin.app.games.entities.GameMetadata
@@ -45,7 +47,10 @@ class GameSaveServiceTest {
     private val game = mockk<Game> {
         every { id } returns 42L
         every { title } returns "Celeste"
-        every { metadata } returns mockk<GameMetadata> { every { path } returns "/games/Celeste" }
+        every { metadata } returns mockk<GameMetadata> {
+            every { path } returns "/games/Celeste"
+            every { originalIds } returns emptyMap()
+        }
     }
 
     // Only the zip magic bytes are checked
@@ -367,13 +372,61 @@ class GameSaveServiceTest {
         assertEquals(archiveOf(orphan), service.archivePath(orphan))
     }
 
+    private fun orphan(id: Long, path: String, providerIds: String? = null) = GameSave(
+        id = id, user = user, game = null, gameTitle = "Celeste", gamePath = path, gameProviderIds = providerIds,
+        contentId = "blob-$id", contentLength = 1L, contentHash = "abc", platform = SavePlatform.WINDOWS
+    )
+
+    private fun libraryGame(gameId: Long, gamePath: String, vararg providerIds: Pair<String, String>) = mockk<Game> {
+        every { id } returns gameId
+        every { metadata } returns mockk<GameMetadata> {
+            every { path } returns gamePath
+            every { originalIds } returns providerIds.associate { PluginManagementEntry(it.first) to it.second }
+        }
+    }
+
     @Test
-    fun `a game added at a deleted game's path takes its saves back`() {
-        every { repository.relinkOrphans(game, "/games/Celeste") } returns 2
+    fun `a game re-added at the same path or with the same provider id takes its saves back`() {
+        val samePath = orphan(1L, "/games/Celeste")
+        val sameProvider = orphan(2L, "/games/Celeste (old)", providerIds = "igdb=celeste\nsteam=504230")
+        val unrelated = orphan(3L, "/games/Hades", providerIds = "igdb=hades")
+        every { repository.findByGameIsNull() } returns listOf(samePath, sameProvider, unrelated)
+        every { repository.saveAll(any<Iterable<GameSave>>()) } answers { firstArg<Iterable<GameSave>>().toList() }
+        val celeste = libraryGame(42L, "/games/Celeste", "steam" to "504230")
 
-        service.onGameCreated(GameCreatedEvent(this, game))
+        service.onGameCreated(GameCreatedEvent(this, celeste))
 
-        verify { repository.relinkOrphans(game, "/games/Celeste") }
+        assertEquals(celeste, samePath.game)
+        assertEquals(celeste, sameProvider.game)
+        assertEquals("/games/Celeste", sameProvider.gamePath)
+        assertEquals("steam=504230", sameProvider.gameProviderIds)
+        assertNull(unrelated.game)
+    }
+
+    @Test
+    fun `saves of a deleted game move to the game that replaced it`() {
+        val save = orphan(1L, "/games/Celeste (old)", providerIds = "igdb=celeste")
+        val replacement = libraryGame(42L, "/games/Celeste", "igdb" to "celeste")
+        every { repository.findByGameIsNull() } returns listOf(save)
+        every { repository.findGameIdsByProviderId("igdb", "celeste") } returns listOf(42L)
+        every { repository.findGameById(42L) } returns replacement
+        every { repository.saveAll(any<Iterable<GameSave>>()) } answers { firstArg<Iterable<GameSave>>().toList() }
+
+        service.onGameDeleted(GameDeletedEvent(this, libraryGame(41L, "/games/Celeste (old)")))
+
+        assertEquals(replacement, save.game)
+    }
+
+    @Test
+    fun `saves stay unlinked when several games share the provider id`() {
+        val save = orphan(1L, "/games/Celeste (old)", providerIds = "igdb=celeste")
+        every { repository.findByGameIsNull() } returns listOf(save)
+        every { repository.findGameIdsByProviderId("igdb", "celeste") } returns listOf(42L, 43L)
+
+        service.onGameDeleted(GameDeletedEvent(this, libraryGame(41L, "/games/Celeste (old)")))
+
+        assertNull(save.game)
+        verify(exactly = 0) { repository.saveAll(any<Iterable<GameSave>>()) }
     }
 
     @Test

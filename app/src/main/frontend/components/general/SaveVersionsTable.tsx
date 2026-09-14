@@ -8,11 +8,10 @@ import {humanFileSize, timeUntil} from "Frontend/util/utils";
 interface SaveVersionsTableProps {
     saves: GameSaveDto[];
     label: string;
-    showDownload?: boolean;
     onChange: () => Promise<void> | void;
 }
 
-export default function SaveVersionsTable({saves, label, showDownload = true, onChange}: SaveVersionsTableProps) {
+export default function SaveVersionsTable({saves, label, onChange}: SaveVersionsTableProps) {
     async function remove(save: GameSaveDto) {
         await SaveSyncEndpoint.deleteSaves([save.id]);
         await onChange();
@@ -43,18 +42,15 @@ export default function SaveVersionsTable({saves, label, showDownload = true, on
                                 <Table.Cell><Chip size="sm" variant="secondary">{save.platform}</Chip></Table.Cell>
                                 <Table.Cell>
                                     <div className="flex flex-row gap-2">
-                                        {/* Download URLs need a game id */}
-                                        {showDownload && save.gameId !== undefined &&
-                                            <Tooltip>
-                                                <Tooltip.Trigger>
-                                                    <Button isIconOnly size="sm" variant="ghost"
-                                                            onPress={() => SaveArchiveEndpoint.downloadSave(save.gameId!, save.id)}>
-                                                        <DownloadSimpleIcon/>
-                                                    </Button>
-                                                </Tooltip.Trigger>
-                                                <Tooltip.Content>Download this version</Tooltip.Content>
-                                            </Tooltip>
-                                        }
+                                        <Tooltip>
+                                            <Tooltip.Trigger>
+                                                <Button isIconOnly size="sm" variant="ghost"
+                                                        onPress={() => SaveArchiveEndpoint.downloadSave(save.id)}>
+                                                    <DownloadSimpleIcon/>
+                                                </Button>
+                                            </Tooltip.Trigger>
+                                            <Tooltip.Content>Download this version</Tooltip.Content>
+                                        </Tooltip>
                                         <Tooltip>
                                             <Tooltip.Trigger>
                                                 <Button isIconOnly size="sm" variant="ghost"
