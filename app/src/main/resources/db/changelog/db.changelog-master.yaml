@@ -1479,3 +1479,68 @@ databaseChangeLog:
               - column:
                   name: SOURCE_MARKETPLACE_ID
                   type: varchar(255)
+
+  - changeSet:
+      id: fork-device-tokens
+      author: wieluk
+      comment: >
+        Long-lived logins for desktop clients; only a SHA-256 hash of each secret is stored.
+        Fork changesets stay behind the upstream ones of the release they were merged into, and later upstream
+        changesets go after them, so backups of older fork versions remain restorable.
+        Installations that created the table with the former Flyway migration V2.4.1.1 mark this as ran.
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: DEVICE_TOKEN
+      changes:
+        - createSequence:
+            sequenceName: DEVICE_TOKEN_SEQ
+            incrementBy: 50
+        - createTable:
+            tableName: DEVICE_TOKEN
+            columns:
+              - column:
+                  name: ID
+                  type: bigint
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: USER_ID
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: NAME
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: TOKEN_HASH
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: UK_DEVICE_TOKEN_HASH
+              - column:
+                  name: CREATED_AT
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: LAST_USED_AT
+                  type: timestamp with time zone
+        - addForeignKeyConstraint:
+            baseTableName: DEVICE_TOKEN
+            baseColumnNames: USER_ID
+            referencedTableName: USERS
+            referencedColumnNames: ID
+            constraintName: FK_DEVICE_TOKEN_USER
+            onDelete: CASCADE
+        - createIndex:
+            tableName: DEVICE_TOKEN
+            indexName: IDX_DEVICE_TOKEN_USER
+            columns:
+              - column:
+                  name: USER_ID
