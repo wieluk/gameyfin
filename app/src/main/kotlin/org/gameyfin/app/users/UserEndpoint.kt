@@ -6,6 +6,7 @@ import jakarta.annotation.security.PermitAll
 import jakarta.annotation.security.RolesAllowed
 import org.gameyfin.app.core.Role
 import org.gameyfin.app.core.security.getCurrentAuth
+import org.gameyfin.app.core.security.requireSessionAuth
 import org.gameyfin.app.users.dto.ExtendedUserInfoDto
 import org.gameyfin.app.users.dto.UserUpdateDto
 import org.gameyfin.app.users.dto.UserEvent
@@ -41,6 +42,7 @@ class UserEndpoint(
 
     @PermitAll
     fun updateUser(updates: UserUpdateDto) {
+        requireSessionAuth()
         val auth = getCurrentAuth() ?: error(NO_AUTH_FOUND)
         userService.updateUser(auth.name, updates)
     }
@@ -72,6 +74,7 @@ class UserEndpoint(
 
     @PermitAll
     fun deleteUser() {
+        requireSessionAuth()
         val auth: Authentication = getCurrentAuth() ?: error(NO_AUTH_FOUND)
         userService.deleteUser(auth.name)
     }

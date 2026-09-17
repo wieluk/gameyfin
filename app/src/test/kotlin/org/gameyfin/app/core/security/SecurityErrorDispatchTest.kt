@@ -39,6 +39,7 @@ class SecurityErrorDispatchTest {
         @Bean fun sessionRegistry(): SessionRegistry = SessionRegistryImpl()
         @Bean fun users(): UserRepository = mockk()
         @Bean fun roleHierarchy(): RoleHierarchy = mockk()
+        @Bean fun deviceTokens(): org.gameyfin.app.users.devicetokens.DeviceTokenService = mockk()
     }
 
     // Register UI collaborators as ready instances so Spring does not autowire their internals.
