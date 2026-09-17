@@ -4,6 +4,7 @@ import com.vaadin.flow.spring.security.VaadinSecurityConfigurer
 import com.vaadin.hilla.route.RouteUtil
 import org.gameyfin.app.config.ConfigProperties
 import org.gameyfin.app.config.ConfigService
+import org.gameyfin.app.users.devicetokens.DeviceTokenService
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Conditional
 import org.springframework.context.annotation.Configuration
@@ -20,6 +21,7 @@ import org.springframework.security.oauth2.client.registration.InMemoryClientReg
 import org.springframework.security.oauth2.core.AuthorizationGrantType
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler
+import org.springframework.security.web.session.SessionManagementFilter
 
 
 @Configuration
@@ -28,7 +30,8 @@ class SecurityConfig(
     private val environment: Environment,
     private val config: ConfigService,
     private val ssoAuthenticationSuccessHandler: SsoAuthenticationSuccessHandler,
-    private val sessionRegistry: SessionRegistry
+    private val sessionRegistry: SessionRegistry,
+    private val deviceTokenService: DeviceTokenService
 ) {
 
     companion object {
@@ -116,6 +119,12 @@ class SecurityConfig(
         // Not needed since the frontend is served by the backend
         http.cors { cors -> cors.disable() }
 
+        // After session management, so a token login is never stored in a session
+        http.addFilterAfter(DeviceTokenAuthenticationFilter(deviceTokenService), SessionManagementFilter::class.java)
+        http.csrf { csrf ->
+            csrf.ignoringRequestMatchers(DeviceTokenAuthenticationFilter.bearerRequests)
+            csrf.csrfTokenRepository(BearerAwareCsrfTokenRepository())
+        }
 
 
         if ("dev" in environment.activeProfiles) {

@@ -11,6 +11,7 @@ import {EmailConfirmationEndpoint, MessageEndpoint, UserEndpoint} from "Frontend
 import {SmallInfoField} from "Frontend/components/general/SmallInfoField";
 import {removeAvatar, uploadAvatar} from "Frontend/endpoints/AvatarEndpoint";
 import Avatar from "Frontend/components/general/Avatar";
+import DeviceTokensTable from "Frontend/components/general/DeviceTokensTable";
 
 interface ProfileFormValues {
     username: string | undefined;
@@ -170,6 +171,8 @@ export default function ProfileManagement() {
                                        autoComplete="new-password" isDisabled={auth.state.user?.managedBySso}/>
                                 <Input name="passwordRepeat" label="Repeat password" type="password"
                                        autoComplete="new-password" isDisabled={auth.state.user?.managedBySso}/>
+                                <Section title="Devices"/>
+                                <DeviceTokensTable/>
                             </div>
                         </div>
                     </Form>
