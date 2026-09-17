@@ -19,7 +19,8 @@ class LiveUserSecurityFilter(
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
         val context = SecurityContextHolder.getContext()
         val auth = context.authentication
-        if (auth != null && auth !is AnonymousAuthenticationToken) {
+        // A device token is checked on every request and must keep its user-only rights
+        if (auth != null && auth !is AnonymousAuthenticationToken && auth !is DeviceTokenAuthentication) {
             val user = when {
                 auth is LiveUserAuthentication -> users.findById(auth.userId).orElse(null)
                 auth.principal is OidcUser -> (auth.principal as OidcUser).subject?.let(users::findByOidcProviderId)

@@ -9,6 +9,9 @@ databaseChangeLog:
       file: db.changelog-fork-save-sync.yaml
       relativeToChangelogFile: true
   - include:
+      file: db.changelog-fork-device-tokens.yaml
+      relativeToChangelogFile: true
+  - include:
       file: db.changelog-2.5.1.yaml
       relativeToChangelogFile: true
   - include:
