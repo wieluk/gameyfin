@@ -10,6 +10,7 @@ import org.gameyfin.app.core.annotations.DynamicPublicAccess
 import org.gameyfin.app.core.plugins.PluginService
 import org.gameyfin.app.core.plugins.marketplace.PluginMarketplaceService
 import org.gameyfin.app.core.security.getCurrentAuth
+import org.gameyfin.app.core.security.isDeviceTokenAuth
 import org.gameyfin.app.users.UserService
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.core.io.FileSystemResource
@@ -17,6 +18,7 @@ import org.springframework.core.io.Resource
 import org.springframework.http.*
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.multipart.MultipartFile
+import org.springframework.web.server.ResponseStatusException
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 
@@ -87,6 +89,7 @@ class ImageEndpoint(
     @PermitAll
     @PostMapping("/avatar/upload")
     fun uploadAvatar(@RequestParam("file") file: MultipartFile) {
+        requireSession()
         val auth = getCurrentAuth() ?: error("No authentication found")
 
         val image: Image = if (!userService.hasAvatar(auth.name)) {
@@ -102,6 +105,7 @@ class ImageEndpoint(
     @PermitAll
     @PostMapping("/avatar/delete")
     fun deleteAvatar() {
+        requireSession()
         val auth = getCurrentAuth() ?: error("No authentication found")
         userService.deleteAvatar(auth.name)
     }
@@ -110,6 +114,12 @@ class ImageEndpoint(
     @PostMapping("/avatar/deleteByName")
     fun deleteAvatarByName(@RequestParam("name") name: String) {
         userService.deleteAvatar(name)
+    }
+
+    private fun requireSession() {
+        if (isDeviceTokenAuth()) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Requires signing in on the web")
+        }
     }
 
     private fun getImageContent(id: Long, request: HttpServletRequest): ResponseEntity<Resource> {
