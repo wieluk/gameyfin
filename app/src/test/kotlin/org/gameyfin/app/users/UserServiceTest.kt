@@ -12,6 +12,7 @@ import org.gameyfin.app.core.events.UserRegistrationWaitingForApprovalEvent
 import org.gameyfin.app.core.security.getCurrentAuth
 import org.gameyfin.app.media.Image
 import org.gameyfin.app.media.ImageService
+import org.gameyfin.app.users.devicetokens.DeviceTokenService
 import org.gameyfin.app.users.dto.ExtendedUserInfoDto
 import org.gameyfin.app.users.dto.UserRegistrationDto
 import org.gameyfin.app.users.dto.UserUpdateDto
@@ -48,6 +49,7 @@ class UserServiceTest {
     private lateinit var emailConfirmationService: EmailConfirmationService
     private lateinit var config: ConfigService
     private lateinit var eventPublisher: ApplicationEventPublisher
+    private lateinit var deviceTokenService: DeviceTokenService
     private lateinit var userService: UserService
 
     @BeforeEach
@@ -60,6 +62,7 @@ class UserServiceTest {
         emailConfirmationService = mockk()
         config = mockk()
         eventPublisher = mockk()
+        deviceTokenService = mockk(relaxed = true)
 
         userService = UserService(
             userRepository,
@@ -69,7 +72,8 @@ class UserServiceTest {
             sessionService,
             emailConfirmationService,
             config,
-            eventPublisher
+            eventPublisher,
+            deviceTokenService
         )
 
         every { eventPublisher.publishEvent(any()) } just Runs
@@ -789,6 +793,7 @@ class UserServiceTest {
 
         assertEquals("encodedNewPassword", user.password)
         verify(exactly = 1) { sessionService.logoutAllSessions() }
+        verify(exactly = 1) { deviceTokenService.revokeAll(user) }
         verify(exactly = 1) { userRepository.save(user) }
     }
 
@@ -834,6 +839,7 @@ class UserServiceTest {
 
         assertEquals("encodedNewPassword", user.password)
         verify(exactly = 1) { userRepository.save(user) }
+        verify(exactly = 1) { deviceTokenService.revokeAll(user) }
     }
 
     @Test

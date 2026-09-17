@@ -1431,6 +1431,10 @@ databaseChangeLog:
       file: db.changelog-fork-save-sync.yaml
       relativeToChangelogFile: true
 
+  - include:
+      file: db.changelog-fork-device-tokens.yaml
+      relativeToChangelogFile: true
+
   - changeSet:
       id: 2.6.0-plugin-marketplace
       author: grimsi
