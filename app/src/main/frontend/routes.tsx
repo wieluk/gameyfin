@@ -26,8 +26,10 @@ import ErrorView from "Frontend/views/ErrorView";
 import GameRequestView from "Frontend/views/GameRequestView";
 import {GameRequestManagement} from "Frontend/components/administration/GameRequestManagement";
 import {DownloadManagement} from "Frontend/components/administration/DownloadManagement";
+import {SaveSyncManagement} from "Frontend/components/administration/SaveSyncManagement";
 import CollectionManagementView from "Frontend/views/CollectionManagementView";
 import CollectionView from "Frontend/views/CollectionView";
+import CloudSavesView from "Frontend/views/CloudSavesView";
 
 export const {router, routes} = new RouterConfigurationBuilder()
     .withReactRoutes([
@@ -50,6 +52,11 @@ export const {router, routes} = new RouterConfigurationBuilder()
                             path: '/requests',
                             element: <GameRequestView/>,
                             handle: {title: 'Game requests'}
+                        },
+                        {
+                            path: 'cloud-saves',
+                            element: <CloudSavesView/>,
+                            handle: {title: 'Cloud Saves'}
                         },
                         {
                             path: 'library/:libraryId',
@@ -109,6 +116,11 @@ export const {router, routes} = new RouterConfigurationBuilder()
                                     path: 'downloads',
                                     element: <DownloadManagement/>,
                                     handle: {title: 'Administration - Downloads'}
+                                },
+                                {
+                                    path: 'save-sync',
+                                    element: <SaveSyncManagement/>,
+                                    handle: {title: 'Administration - Save Sync'}
                                 },
                                 {
                                     path: 'users',

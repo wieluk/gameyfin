@@ -1,4 +1,5 @@
 import {
+    CloudArrowUpIcon,
     DiscIcon,
     DownloadSimpleIcon,
     EnvelopeIcon,
@@ -26,6 +27,11 @@ const menuItems: MenuItem[] = [
         title: "Downloads",
         url: "downloads",
         icon: <DownloadSimpleIcon/>
+    },
+    {
+        title: "Save Sync",
+        url: "save-sync",
+        icon: <CloudArrowUpIcon/>
     },
     {
         title: "Users",

@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Conditional
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
 import org.springframework.core.env.Environment
+import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
@@ -20,6 +21,7 @@ import org.springframework.security.oauth2.client.registration.InMemoryClientReg
 import org.springframework.security.oauth2.core.AuthorizationGrantType
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
 
 
 @Configuration
@@ -93,8 +95,10 @@ class SecurityConfig(
                 .requestMatchers(
                     "/administration/**",
                     "/settings/**",
-                    "/collection/**"
+                    "/collection/**",
+                    "/cloud-saves/**"
                 ).permitAll()
+                .requestMatchers("/saves/**").authenticated()
                 // Dynamic public access for certain endpoints
                 .requestMatchers(
                     "/",
@@ -104,6 +108,15 @@ class SecurityConfig(
                     "/requests/**",
                     "/download/**"
                 ).access(DynamicPublicAccessAuthorizationManager(config))
+        }
+
+        // The desktop client sends no CSRF token
+        http.csrf { csrf ->
+            val path = PathPatternRequestMatcher.withDefaults()
+            csrf.ignoringRequestMatchers(
+                path.matcher(HttpMethod.POST, "/saves/game/*"),
+                path.matcher(HttpMethod.DELETE, "/saves/game/*/*")
+            )
         }
 
         http.sessionManagement { sessionManagement ->

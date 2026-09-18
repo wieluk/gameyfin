@@ -5,8 +5,10 @@ import GameyfinLogo from "Frontend/components/theming/GameyfinLogo";
 import * as PackageJson from "../../../../package.json";
 import {Outlet, useLocation, useNavigate} from "react-router";
 import {useAuth} from "Frontend/util/auth";
+import {useSaveSyncEnabled} from "Frontend/util/saveSync";
 import {
     ArrowLeftIcon,
+    CloudArrowUpIcon,
     DiceSixIcon,
     DiscIcon,
     HeartIcon,
@@ -32,6 +34,7 @@ export default function MainLayout() {
     const isSearchPage = location.pathname.startsWith("/search");
     const isHomePage = location.pathname === "/";
     const [isExploding, setIsExploding] = useState(false);
+    const saveSyncEnabled = useSaveSyncEnabled();
     const games = useSnapshot(gameState).games;
 
     useEffect(() => {
@@ -101,7 +104,19 @@ export default function MainLayout() {
                         </Button>
                     </Tooltip>
                 </NavbarContent>}
-                <NavbarContent justify="end" className="items-center">
+                <NavbarContent justify="end" className="items-center ml-4">
+                    {saveSyncEnabled &&
+                        <NavbarItem>
+                            <Tooltip content="Your synced game saves" placement="bottom">
+                                <Button variant="flat"
+                                        isDisabled={window.location.pathname.startsWith("/cloud-saves")}
+                                        onPress={() => navigate("/cloud-saves")}
+                                        startContent={<CloudArrowUpIcon weight="fill"/>}>
+                                    Saves
+                                </Button>
+                            </Tooltip>
+                        </NavbarItem>
+                    }
                     <NavbarItem>
                         <Tooltip content="Request a game" placement="bottom">
                             <Button color="primary"
