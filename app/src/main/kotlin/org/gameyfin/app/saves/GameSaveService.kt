@@ -44,7 +44,6 @@ sealed interface StoreResult {
     data object NotAnArchive : StoreResult
 }
 
-// Client input, untrusted
 data class SaveUploadMetadata(
     val declaredHash: String,
     val platform: SavePlatform = SavePlatform.UNKNOWN,
@@ -71,16 +70,14 @@ class GameSaveService(
         private const val BYTES_PER_MB = 1024L * 1024L
     }
 
-    // Per user, not per game, because saves outlive their game
     private val savesRoot: Path = Path(storageRoot, "saves")
     private val transaction = TransactionTemplate(transactionManager)
 
-    // Listeners run after commit and need their own transaction
     private val newTransaction = TransactionTemplate(transactionManager).apply {
         propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
     }
 
-    // One upload per user at a time, so the conflict and quota checks can't race (single process)
+    // One upload per user at a time, so the quota and conflict checks can't race
     private val uploadLocks = ConcurrentHashMap<Long, ReentrantLock>()
 
     fun enabled(): Boolean = config.get(ConfigProperties.SaveSync.Enabled)!!
@@ -98,7 +95,6 @@ class GameSaveService(
 
     fun currentUser(): User? = getCurrentAuth()?.let { userService.getByUsername(it.name) }
 
-    // The owner, or a role above the owner's
     fun canManage(save: GameSave, user: User): Boolean = save.user.id == user.id || userService.canManage(save.user)
 
     fun archivePath(save: GameSave): Path? {
@@ -110,7 +106,7 @@ class GameSaveService(
         return archive
     }
 
-    // Streams outside the transaction so a slow upload doesn't hold a DB connection
+    // Outside the transaction, so a slow upload doesn't hold a DB connection
     fun store(user: User, game: Game, input: InputStream, metadata: SaveUploadMetadata): StoreResult {
         if (!enabled()) return StoreResult.Disabled
 
@@ -146,13 +142,11 @@ class GameSaveService(
         gameSaveRepository.save(save)
     }
 
-    // Rows cascade, files on disk don't
     @TransactionalEventListener(fallbackExecution = true)
     fun onUserDeleted(event: UserDeletedEvent) {
         savesRoot.resolve("${event.user.id}").toFile().deleteRecursively()
     }
 
-    // A game re-added at the same path (remounted share) or with the same provider id (new folder) gets its saves back
     @TransactionalEventListener(fallbackExecution = true)
     fun onGameCreated(event: GameCreatedEvent) {
         val game = event.game
@@ -165,7 +159,7 @@ class GameSaveService(
         }
     }
 
-    // Scans add the new copy of a game before deleting the old one, so onGameCreated can't catch that case
+    // Scans add the new copy before deleting the old one, which onGameCreated can't see
     @TransactionalEventListener(fallbackExecution = true)
     fun onGameDeleted(event: GameDeletedEvent) {
         newTransaction.executeWithoutResult {
@@ -176,7 +170,6 @@ class GameSaveService(
         }
     }
 
-    // Null unless exactly one game matches, e.g. not when two editions share an id
     private fun findReplacement(providerIds: String?): Game? =
         parseProviderIds(providerIds)
             .flatMap { gameSaveRepository.findGameIdsByProviderId(it.substringBefore('='), it.substringAfter('=')) }
@@ -241,7 +234,6 @@ class GameSaveService(
 
     private fun maxVersionsPerGame(): Int = config.get(ConfigProperties.SaveSync.MaxVersionsPerGame)!!
 
-    // Locked versions don't use a slot
     private fun prune(userId: Long, gameId: Long) {
         delete(list(userId, gameId).filterNot { it.locked }.drop(maxVersionsPerGame()))
     }
@@ -269,7 +261,6 @@ class GameSaveService(
 
     private fun archiveFile(userId: Long, contentId: String): Path = savesRoot.resolve("$userId").resolve(contentId)
 
-    // Null once the stream exceeds maxSize
     private fun streamAndHash(input: InputStream, target: Path, maxSize: Long): String? {
         val digest = MessageDigest.getInstance("SHA-256")
         val buffer = ByteArray(64 * 1024)

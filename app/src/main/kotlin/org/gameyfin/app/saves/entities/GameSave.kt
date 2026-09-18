@@ -18,18 +18,16 @@ class GameSave(
     @OnDelete(action = OnDeleteAction.CASCADE)
     val user: User,
 
-    // Nullable: scans delete games whose folder is missing, e.g. on an unmounted share
     @ManyToOne(fetch = FetchType.EAGER)
     @OnDelete(action = OnDeleteAction.SET_NULL)
     var game: Game?,
 
-    // Kept so the save can be shown and relinked after its game is deleted
     val gameTitle: String? = null,
 
     @Column(nullable = false)
     var gamePath: String,
 
-    // One "pluginId=originalId" per line, so the game is recognized when re-added under another folder
+    // One "pluginId=originalId" per line
     @Column(length = 1024)
     var gameProviderIds: String? = null,
 
@@ -53,7 +51,6 @@ class GameSave(
 
     val ludusaviTitle: String? = null,
 
-    // Never pruned
     @Column(nullable = false)
     var locked: Boolean = false,
 
