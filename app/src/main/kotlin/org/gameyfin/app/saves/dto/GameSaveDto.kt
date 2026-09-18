@@ -5,7 +5,6 @@ import java.time.Instant
 
 data class GameSaveDto(
     val id: Long,
-    // Null if the game was removed from the library
     val gameId: Long?,
     val gameTitle: String?,
     val sizeBytes: Long,

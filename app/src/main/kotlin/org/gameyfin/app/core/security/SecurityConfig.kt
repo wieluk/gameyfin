@@ -110,7 +110,7 @@ class SecurityConfig(
                 ).access(DynamicPublicAccessAuthorizationManager(config))
         }
 
-        // The desktop client has no CSRF token; both requests need a CORS preflight, and CORS is off
+        // The desktop client sends no CSRF token
         http.csrf { csrf ->
             val path = PathPatternRequestMatcher.withDefaults()
             csrf.ignoringRequestMatchers(

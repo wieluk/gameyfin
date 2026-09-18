@@ -7,7 +7,6 @@ export function useSaveSyncEnabled(): boolean | undefined {
     const [enabled, setEnabled] = useState<boolean | undefined>();
 
     useEffect(() => {
-        // The endpoint needs a session
         if (!auth.state.user) {
             setEnabled(false);
             return;

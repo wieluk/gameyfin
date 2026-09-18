@@ -32,7 +32,6 @@ interface GameGroup {
     lastSyncedAt?: string;
 }
 
-// Removed games have no id, so group their saves by title
 function groupKey(save: GameSaveDto): string {
     return save.gameId !== undefined ? `game-${save.gameId}` : `removed-${save.gameTitle}`;
 }
@@ -48,7 +47,6 @@ function groupByGame(saves: GameSaveDto[]): GameGroup[] {
             gameTitle: save.gameTitle ?? "Unknown game",
             versions: [],
             totalBytes: 0,
-            // Saves arrive newest first
             lastSyncedAt: save.createdAt
         };
         group.versions.push(save);
