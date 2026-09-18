@@ -50,7 +50,6 @@ class SaveSyncEndpoint(
 
     private fun currentUser(): User = gameSaveService.currentUser() ?: throw EndpointException("Unknown user")
 
-    // All or nothing; other users' saves look missing so ids can't be probed
     private fun manageable(saveIds: List<Long>): List<GameSave> {
         val user = currentUser()
         val saves = gameSaveService.byIds(saveIds)
