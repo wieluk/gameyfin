@@ -53,7 +53,6 @@ class GameSaveServiceTest {
         }
     }
 
-    // Only the zip magic bytes are checked
     private val archive = byteArrayOf(0x50, 0x4B, 0x03, 0x04) + ByteArray(60) { it.toByte() }
     private val archiveHash = sha256(archive)
 
@@ -191,7 +190,6 @@ class GameSaveServiceTest {
     fun `uploads built on the same version cannot both be stored when they arrive together`() {
         var latest = existing(1L)
         every { repository.findFirstByUserIdAndGameIdOrderByCreatedAtDescIdDesc(1L, 42L) } answers {
-            // Widens the race window
             latest.also { Thread.sleep(200) }
         }
         every { repository.findByUserIdAndGameIdOrderByCreatedAtDescIdDesc(1L, 42L) } answers { listOf(latest) }
@@ -280,7 +278,6 @@ class GameSaveServiceTest {
     fun `quota accounts for the versions retention is about to reclaim`() {
         every { config.get(ConfigProperties.SaveSync.MaxTotalPerUserMb) } returns 1
         every { config.get(ConfigProperties.SaveSync.MaxVersionsPerGame) } returns 1
-        // At the limit, but the old version gets pruned
         every { repository.totalBytesForUser(1L) } returns 1024L * 1024L
         versions(existing(1L, size = 1024L * 1024L))
 
@@ -294,7 +291,6 @@ class GameSaveServiceTest {
         val keep = existing(3L)
         val locked = existing(2L, locked = true)
         val oldest = existing(1L)
-        // The quota check sees three versions, pruning also sees the new one
         every { repository.findByUserIdAndGameIdOrderByCreatedAtDescIdDesc(1L, 42L) } returnsMany
                 listOf(listOf(keep, locked, oldest), listOf(stored, keep, locked, oldest))
         every { repository.findFirstByUserIdAndGameIdOrderByCreatedAtDescIdDesc(1L, 42L) } returns keep
@@ -305,7 +301,6 @@ class GameSaveServiceTest {
         val result = upload(baseSaveId = 3L)
 
         assertIs<StoreResult.Stored>(result)
-        // Limit 2: the new version and `keep` stay, `oldest` goes, locked is exempt
         assertEquals(listOf(1L), deleted.captured.map { it.id })
         assertFalse(archiveOf(oldest).exists())
         assertTrue(archiveOf(locked).exists())
