@@ -15,7 +15,6 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.io.InputStream
 
-// Plain MVC because Hilla RPC is JSON only
 @RestController
 @RequestMapping("/saves")
 class SaveSyncController(
@@ -34,7 +33,6 @@ class SaveSyncController(
     fun downloadVersion(@PathVariable gameId: Long, @PathVariable saveId: Long): ResponseEntity<Resource> =
         withUser { user -> serve(find(gameId, saveId), user) }
 
-    // No game id, so saves of games that left the library can be downloaded too
     @GetMapping("/{saveId}")
     fun download(@PathVariable saveId: Long): ResponseEntity<Resource> =
         withUser { user -> serve(gameSaveService.byId(saveId), user) }
@@ -95,7 +93,6 @@ class SaveSyncController(
         return block(user)
     }
 
-    // Same rule as delete: the owner, or a role above the owner's
     private fun serve(save: GameSave?, user: User): ResponseEntity<Resource> {
         val allowed = save?.takeIf { gameSaveService.canManage(it, user) }
         val archive = allowed?.let { gameSaveService.archivePath(it) } ?: return ResponseEntity.notFound().build()
@@ -117,6 +114,5 @@ class SaveSyncController(
     private fun parsePlatform(raw: String?): SavePlatform =
         raw?.trim()?.uppercase()?.let { value -> SavePlatform.entries.find { it.name == value } } ?: SavePlatform.UNKNOWN
 
-    // 405, not 404, so clients can tell "disabled" from "not supported"
     private fun <T : Any> disabled(): ResponseEntity<T> = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).build()
 }
