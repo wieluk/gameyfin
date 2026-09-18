@@ -12,6 +12,7 @@ import org.gameyfin.app.core.events.UserRegistrationWaitingForApprovalEvent
 import org.gameyfin.app.core.security.getCurrentAuth
 import org.gameyfin.app.media.Image
 import org.gameyfin.app.media.ImageService
+import org.gameyfin.app.users.devicetokens.DeviceTokenService
 import org.gameyfin.app.users.dto.ExtendedUserInfoDto
 import org.gameyfin.app.users.dto.UserRegistrationDto
 import org.gameyfin.app.users.dto.UserUpdateDto
@@ -39,7 +40,8 @@ class UserService(
     private val sessionService: SessionService,
     private val emailConfirmationService: EmailConfirmationService,
     private val config: ConfigService,
-    private val eventPublisher: ApplicationEventPublisher
+    private val eventPublisher: ApplicationEventPublisher,
+    private val deviceTokenService: DeviceTokenService
 ) : UserDetailsService {
 
     companion object {
@@ -229,6 +231,7 @@ class UserService(
         updates.password?.let {
             user.password = passwordEncoder.encode(it)
             sessionService.logoutAllSessions()
+            deviceTokenService.revokeAll(user)
         }
 
         updates.email?.let {
@@ -244,6 +247,7 @@ class UserService(
     fun updatePassword(user: org.gameyfin.app.users.entities.User, newPassword: String) {
         user.password = passwordEncoder.encode(newPassword)
         userRepository.save(user)
+        deviceTokenService.revokeAll(user)
     }
 
     fun assignRoles(username: String, roleNames: List<String>): RoleAssignmentResult {
