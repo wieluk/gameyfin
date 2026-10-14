@@ -168,6 +168,26 @@ class DownloadServiceTest {
     }
 
     @Test
+    fun `processDownload should close the source when done`() {
+        var closed = false
+        val inputStream = object : ByteArrayInputStream("test data".toByteArray()) {
+            override fun close() {
+                closed = true
+            }
+        }
+        val tracker = mockk<SessionBandwidthTracker>(relaxed = true)
+
+        every { configService.get(ConfigProperties.Downloads.BandwidthLimitEnabled) } returns false
+        every { configService.get(ConfigProperties.Downloads.BandwidthLimitMbps) } returns 0
+        every { sessionBandwidthManager.getTracker("session-123", 0) } returns tracker
+        every { tracker.activeDownloads } returns mockk { every { get() } returns 0 }
+
+        service.processDownload(inputStream, ByteArrayOutputStream(), createMockGame(1L, "Test Game"), null, "session-123", "192.168.1.1")
+
+        assertTrue(closed)
+    }
+
+    @Test
     fun `processDownload should use monitored stream when bandwidth limiting disabled`() {
         val inputStream = ByteArrayInputStream("test data".toByteArray())
         val outputStream = ByteArrayOutputStream()
