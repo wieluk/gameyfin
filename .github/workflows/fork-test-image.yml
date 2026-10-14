@@ -12,11 +12,11 @@ on:
       branch:
         description: 'Branch to build'
         required: true
-        default: 'feature/save-sync'
+        default: 'integration/gameyfin-app'
       tag:
         description: 'Image tag to publish'
         required: true
-        default: 'save-sync'
+        default: 'gameyfin-app'
 
 jobs:
   image:
