@@ -6,18 +6,16 @@ import org.gameyfin.pluginapi.core.wrapper.ConfigurableGameyfinPlugin
 import org.gameyfin.pluginapi.core.wrapper.PluginContext
 import org.gameyfin.pluginapi.download.Download
 import org.gameyfin.pluginapi.download.DownloadProvider
-import org.gameyfin.pluginapi.download.FileDownload
+import org.gameyfin.pluginapi.download.ResumableFileDownload
 import org.pf4j.Extension
-import java.io.IOException
-import java.io.InputStream
-import java.io.PipedInputStream
-import java.io.PipedOutputStream
-import java.nio.file.Files
+import java.nio.channels.Channels
+import java.nio.channels.FileChannel
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import kotlin.io.path.exists
 import kotlin.io.path.extension
 import kotlin.io.path.fileSize
+import kotlin.io.path.getLastModifiedTime
 import kotlin.io.path.isDirectory
 
 class DirectDownloadPlugin(context: PluginContext) : ConfigurableGameyfinPlugin(context) {
@@ -47,36 +45,23 @@ class DirectDownloadPlugin(context: PluginContext) : ConfigurableGameyfinPlugin(
         override fun download(path: Path): Download {
             if (!path.exists()) throw IllegalArgumentException("Path $path does not exist")
 
-            val isDirectory = path.isDirectory()
-            return FileDownload(
-                // Folders are packed as a STORED zip whose size is known up front, so the
-                // download advertises a Content-Length (browser shows size + progress bar).
-                // See StoredZip for the rationale and the ZIP64 handling.
-                data = if (isDirectory) StoredZip.stream(path) else streamFile(path),
-                fileExtension = if (isDirectory) "zip" else path.extension,
-                size = if (isDirectory) StoredZip.computeSize(path) else path.fileSize()
-            )
+            if (!path.isDirectory()) return resumableFile(path)
+
+            // Folders are packed as an uncompressed zip whose every byte is known up front, so the
+            // download has a Content-Length and can resume. See FolderZip for the layout.
+            val zip = FolderZip.of(path)
+            return ResumableFileDownload("zip", zip.size, zip.version, zip::open)
         }
 
-        fun streamFile(path: Path): InputStream {
-            val pipeIn = PipedInputStream(512 * 1024)
-            val pipeOut = PipedOutputStream(pipeIn)
-
-            Thread.ofVirtual().start {
-                try {
-                    Files.newInputStream(path, StandardOpenOption.READ).use { input ->
-                        input.copyTo(pipeOut, 512 * 1024)
-                    }
-                } catch (_: IOException) {
-                } finally {
-                    try {
-                        pipeOut.close()
-                    } catch (_: IOException) {
-                    }
-                }
-            }
-
-            return pipeIn
+        fun resumableFile(path: Path): ResumableFileDownload {
+            val size = path.fileSize()
+            val modified = path.getLastModifiedTime()
+            return ResumableFileDownload(
+                fileExtension = path.extension,
+                size = size,
+                version = FolderZip.fingerprint(sequenceOf("file-1", path.toString(), "$size", "${modified.toMillis()}")),
+                open = { offset -> Channels.newInputStream(FileChannel.open(path, StandardOpenOption.READ).position(offset)) },
+            )
         }
     }
 }
