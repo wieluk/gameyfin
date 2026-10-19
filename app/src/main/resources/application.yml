@@ -19,6 +19,10 @@ gameyfin:
 
 server:
   port: 8080
+  # Text responses only (Spring's default types): the game list is JSON that shrinks several
+  # times over, while downloads are binary and keep their byte ranges.
+  compression:
+    enabled: true
   servlet:
     session:
       tracking-modes: cookie
