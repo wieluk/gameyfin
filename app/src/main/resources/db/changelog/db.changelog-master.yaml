@@ -1428,6 +1428,128 @@ databaseChangeLog:
                   name: STARTED_AT
 
   - changeSet:
+      id: fork-save-sync-game-save
+      author: wieluk
+      comment: >
+        Save synchronization: one row per uploaded save version, the archive itself lives in the file storage.
+        A save outlives its game (GAME_ID is cleared), GAME_PATH and GAME_PROVIDER_IDS let the game claim it back.
+        Fork changesets stay behind the upstream ones of the release they were merged into, and later upstream
+        changesets go after them, so backups of older fork versions remain restorable.
+        Installations that created the table with the former Flyway migration V2.4.0.3 mark this as ran.
+      preConditions:
+        - onFail: MARK_RAN
+          not:
+            tableExists:
+              tableName: GAME_SAVE
+      changes:
+        - createSequence:
+            sequenceName: GAME_SAVE_SEQ
+            incrementBy: 50
+        - createTable:
+            tableName: GAME_SAVE
+            columns:
+              - column:
+                  name: ID
+                  type: bigint
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: CREATED_AT
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: USER_ID
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: GAME_ID
+                  type: bigint
+              - column:
+                  name: GAME_TITLE
+                  type: varchar(255)
+              - column:
+                  name: GAME_PATH
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: GAME_PROVIDER_IDS
+                  type: varchar(1024)
+              - column:
+                  name: CONTENT_ID
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: CONTENT_LENGTH
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: CONTENT_HASH
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: PLATFORM
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: INSTALLATION_ID
+                  type: varchar(255)
+              - column:
+                  name: DEVICE_NAME
+                  type: varchar(255)
+              - column:
+                  name: LUDUSAVI_TITLE
+                  type: varchar(255)
+              - column:
+                  name: LOCKED
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: GAME_SAVE
+            baseColumnNames: USER_ID
+            referencedTableName: USERS
+            referencedColumnNames: ID
+            constraintName: FK_GAME_SAVE_USER
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: GAME_SAVE
+            baseColumnNames: GAME_ID
+            referencedTableName: GAME
+            referencedColumnNames: ID
+            constraintName: FK_GAME_SAVE_GAME
+            onDelete: SET NULL
+        - createIndex:
+            tableName: GAME_SAVE
+            indexName: IDX_GAME_SAVE_USER_GAME_CREATED
+            columns:
+              - column:
+                  name: USER_ID
+              - column:
+                  name: GAME_ID
+              - column:
+                  name: CREATED_AT
+                  descending: true
+        - createIndex:
+            tableName: GAME_SAVE
+            indexName: IDX_GAME_SAVE_USER_GAME_HASH
+            columns:
+              - column:
+                  name: USER_ID
+              - column:
+                  name: GAME_ID
+              - column:
+                  name: CONTENT_HASH
+
+  - changeSet:
       id: 2.6.0-plugin-marketplace
       author: grimsi
       comment: >
