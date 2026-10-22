@@ -13,6 +13,7 @@ import org.gameyfin.app.saves.entities.GameSave
 import org.gameyfin.app.saves.entities.SavePlatform
 import org.gameyfin.app.users.UserService
 import org.gameyfin.app.users.entities.User
+import org.hibernate.LazyInitializationException
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -70,6 +71,7 @@ class GameSaveServiceTest {
         every { repository.totalBytesForUser(1L) } returns 0L
         every { repository.save(any()) } answers { firstArg<GameSave>().also { it.id = 100L } }
         every { repository.deleteAll(any<Iterable<GameSave>>()) } just runs
+        every { repository.findGameById(42L) } returns game
 
         service = GameSaveService(repository, userService, config, mockk(relaxed = true), storageRoot.toString())
     }
@@ -132,6 +134,19 @@ class GameSaveServiceTest {
 
         assertIs<StoreResult.Disabled>(upload())
         verify(exactly = 0) { repository.save(any()) }
+    }
+
+    @Test
+    fun `store reads provider ids from the game reloaded in its transaction`() {
+        versions()
+        every { repository.findGameById(42L) } returns libraryGame(42L, "/games/Celeste", "steam" to "504230")
+
+        val result = service.store(
+            user, detached(42L, "/games/Celeste"), archive.inputStream(), SaveUploadMetadata(declaredHash = archiveHash)
+        )
+
+        assertIs<StoreResult.Stored>(result)
+        assertEquals("steam=504230", result.save.gameProviderIds)
     }
 
     @Test
@@ -372,8 +387,19 @@ class GameSaveServiceTest {
         contentId = "blob-$id", contentLength = 1L, contentHash = "abc", platform = SavePlatform.WINDOWS
     )
 
+    /** A game loaded outside the current transaction: since 2.5.1 its provider ids are lazy. */
+    private fun detached(gameId: Long, gamePath: String) = mockk<Game> {
+        every { id } returns gameId
+        every { title } returns "Celeste"
+        every { metadata } returns mockk<GameMetadata> {
+            every { path } returns gamePath
+            every { originalIds } throws LazyInitializationException("no session")
+        }
+    }
+
     private fun libraryGame(gameId: Long, gamePath: String, vararg providerIds: Pair<String, String>) = mockk<Game> {
         every { id } returns gameId
+        every { title } returns "Celeste"
         every { metadata } returns mockk<GameMetadata> {
             every { path } returns gamePath
             every { originalIds } returns providerIds.associate { PluginManagementEntry(it.first) to it.second }
@@ -388,8 +414,10 @@ class GameSaveServiceTest {
         every { repository.findByGameIsNull() } returns listOf(samePath, sameProvider, unrelated)
         every { repository.saveAll(any<Iterable<GameSave>>()) } answers { firstArg<Iterable<GameSave>>().toList() }
         val celeste = libraryGame(42L, "/games/Celeste", "steam" to "504230")
+        every { repository.findGameById(42L) } returns celeste
 
-        service.onGameCreated(GameCreatedEvent(this, celeste))
+        // The event carries a detached copy, whose lazy provider ids can no longer load.
+        service.onGameCreated(GameCreatedEvent(this, detached(42L, "/games/Celeste")))
 
         assertEquals(celeste, samePath.game)
         assertEquals(celeste, sameProvider.game)
