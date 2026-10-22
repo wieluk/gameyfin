@@ -149,9 +149,10 @@ class GameSaveService(
 
     @TransactionalEventListener(fallbackExecution = true)
     fun onGameCreated(event: GameCreatedEvent) {
-        val game = event.game
-        val providerIds = providerIds(game)
         newTransaction.executeWithoutResult {
+            // The event's copy is detached, and its provider ids are loaded lazily
+            val game = gameSaveRepository.findGameById(event.game.id!!) ?: return@executeWithoutResult
+            val providerIds = providerIds(game)
             val matching = gameSaveRepository.findByGameIsNull().filter { save ->
                 save.gamePath == game.metadata.path || parseProviderIds(save.gameProviderIds).any { it in providerIds }
             }
@@ -197,9 +198,11 @@ class GameSaveService(
     private fun parseProviderIds(raw: String?): Set<String> =
         raw?.lines()?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
-    private fun persist(user: User, game: Game, file: Path, hash: String, metadata: SaveUploadMetadata): StoreResult {
+    private fun persist(user: User, uploaded: Game, file: Path, hash: String, metadata: SaveUploadMetadata): StoreResult {
         val userId = user.id!!
-        val gameId = game.id!!
+        val gameId = uploaded.id!!
+        // The caller loaded it outside this transaction, and its provider ids are loaded lazily
+        val game = gameSaveRepository.findGameById(gameId) ?: uploaded
 
         val latest = gameSaveRepository.findFirstByUserIdAndGameIdOrderByCreatedAtDescIdDesc(userId, gameId)
         if (latest != null && latest.contentHash == hash) return StoreResult.Unchanged(latest)
