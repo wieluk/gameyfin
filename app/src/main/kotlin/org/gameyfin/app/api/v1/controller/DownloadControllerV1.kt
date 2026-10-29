@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.context.request.WebRequest
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
+import tools.jackson.databind.json.JsonMapper
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 
@@ -35,7 +36,8 @@ import java.time.Duration
 @RequestMapping("/v1")
 class DownloadControllerV1(
     private val access: ApiAccess, private val downloads: DownloadService,
-    private val catalog: CatalogServiceV1, private val games: GameService, private val images: ImageService
+    private val catalog: CatalogServiceV1, private val games: GameService, private val images: ImageService,
+    private val mapper: JsonMapper
 ) {
 
     @GetMapping("/download-providers")
@@ -66,7 +68,8 @@ class DownloadControllerV1(
         @Parameter(description = "Download provider key, as returned by GET /v1/download-providers.")
         @RequestParam provider: String,
         request: HttpServletRequest
-    ): ResponseEntity<*> {
+    ): ResponseEntity<StreamingResponseBody> {
+        // Declared as a stream for both kinds: Spring only streams a body whose declared type says so.
         val actor = access.require(ApiScope.DOWNLOADS_READ)
         val game = catalog.gameEntity(id)
         require(downloads.getProviders().any { it.key == provider }) { "Unknown download provider" }
@@ -103,8 +106,10 @@ class DownloadControllerV1(
 
             is LinkDownload -> {
                 games.incrementDownloadCount(game)
+                val link = mapper.writeValueAsBytes(DownloadLinkV1(url = download.url))
                 ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_JSON)
-                    .body(DownloadLinkV1(url = download.url))
+                    .contentLength(link.size.toLong())
+                    .body(StreamingResponseBody { it.write(link) })
             }
         }
     }

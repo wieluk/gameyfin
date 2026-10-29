@@ -2,7 +2,6 @@ package org.gameyfin.app.api.v1
 
 import io.mockk.*
 import org.gameyfin.app.api.v1.controller.DownloadControllerV1
-import org.gameyfin.app.api.v1.dto.DownloadLinkV1
 import org.gameyfin.app.api.v1.dto.DownloadProviderV1
 import org.gameyfin.app.api.v1.service.CatalogServiceV1
 import org.gameyfin.app.core.download.files.DownloadService
@@ -18,8 +17,13 @@ import org.springframework.core.io.FileSystemResource
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockHttpServletRequest
+import org.springframework.mock.web.MockHttpServletResponse
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.context.request.ServletWebRequest
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
+import tools.jackson.databind.json.JsonMapper
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.nio.file.Files
@@ -33,7 +37,8 @@ class DownloadControllerV1Test {
     private val catalog = mockk<CatalogServiceV1>()
     private val games = mockk<GameService>(relaxed = true)
     private val images = mockk<ImageService>()
-    private val controller = DownloadControllerV1(access, downloads, catalog, games, images)
+    private val controller =
+        DownloadControllerV1(access, downloads, catalog, games, images, JsonMapper.builder().build())
 
     private fun provider(key: String = "direct", priority: Int = 1) =
         DownloadProviderDto(key, "Provider $key", priority, "Description $key")
@@ -106,10 +111,36 @@ class DownloadControllerV1Test {
 
         val response = controller.download("10", "direct", MockHttpServletRequest())
 
-        assertEquals(DownloadLinkV1(url = "https://example.test/game.zip"), response.body)
-        assertEquals("link", (response.body as DownloadLinkV1).kind)
+        val body = ByteArrayOutputStream().also { response.body!!.writeTo(it) }.toString()
+        assertEquals("""{"kind":"link","url":"https://example.test/game.zip"}""", body)
+        assertEquals(body.length.toLong(), response.headers.contentLength)
         assertEquals(MediaType.APPLICATION_JSON, response.headers.contentType)
         verify { games.incrementDownloadCount(game) }
+    }
+
+    @Test
+    fun `files and links reach the client through Spring MVC`() {
+        val game = testGame(title = "Celeste")
+        every { catalog.gameEntity("10") } returns game
+        every { downloads.getProviders() } returns listOf(provider())
+        every { downloads.processDownload(any(), any(), any(), any(), any(), any()) } answers {
+            firstArg<InputStream>().transferTo(secondArg())
+        }
+        val mvc = MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(ApiErrors()).build()
+        fun fetch(): MockHttpServletResponse {
+            val started = mvc.perform(get("/v1/games/10/download").param("provider", "direct")).andReturn()
+            return mvc.perform(asyncDispatch(started)).andReturn().response
+        }
+
+        every { downloads.getDownload(any(), any()) } returns FileDownload("game bytes".byteInputStream(), "zip", 10)
+        val file = fetch()
+        assertEquals(200, file.status)
+        assertEquals("game bytes", file.contentAsString)
+
+        every { downloads.getDownload(any(), any()) } returns LinkDownload("https://example.test/game.zip")
+        val link = fetch()
+        assertEquals(200, link.status)
+        assertEquals("""{"kind":"link","url":"https://example.test/game.zip"}""", link.contentAsString)
     }
 
     @Test
