@@ -1,7 +1,9 @@
 package org.gameyfin.app.users
 
+import com.vaadin.hilla.exception.EndpointException
 import io.mockk.*
 import org.gameyfin.app.core.Role
+import org.gameyfin.app.core.security.DeviceTokenAuthentication
 import org.gameyfin.app.core.security.getCurrentAuth
 import org.gameyfin.app.users.dto.ExtendedUserInfoDto
 import org.gameyfin.app.users.dto.UserUpdateDto
@@ -134,6 +136,26 @@ class UserEndpointTest {
         assertThrows(IllegalStateException::class.java) {
             userEndpoint.updateUser(updates)
         }
+    }
+
+    @Test
+    fun `updateUser should refuse device token authentication`() {
+        mockkStatic("org.gameyfin.app.core.security.SecurityUtilsKt")
+        every { getCurrentAuth() } returns mockk<DeviceTokenAuthentication>()
+
+        assertThrows(EndpointException::class.java) {
+            userEndpoint.updateUser(UserUpdateDto(username = null, password = "hijacked", email = null))
+        }
+        verify(exactly = 0) { userService.updateUser(any(), any()) }
+    }
+
+    @Test
+    fun `deleteUser should refuse device token authentication`() {
+        mockkStatic("org.gameyfin.app.core.security.SecurityUtilsKt")
+        every { getCurrentAuth() } returns mockk<DeviceTokenAuthentication>()
+
+        assertThrows(EndpointException::class.java) { userEndpoint.deleteUser() }
+        verify(exactly = 0) { userService.deleteUser(any()) }
     }
 
     @Test
