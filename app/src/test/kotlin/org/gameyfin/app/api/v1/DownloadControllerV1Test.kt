@@ -13,6 +13,7 @@ import org.gameyfin.app.media.ImageService
 import org.gameyfin.app.media.ImageType
 import org.gameyfin.pluginapi.download.FileDownload
 import org.gameyfin.pluginapi.download.LinkDownload
+import org.gameyfin.pluginapi.download.ResumableFileDownload
 import org.junit.jupiter.api.Test
 import org.springframework.core.io.FileSystemResource
 import org.springframework.http.HttpHeaders
@@ -82,6 +83,29 @@ class DownloadControllerV1Test {
 
         assertEquals("download", response.headers.contentDisposition.filename)
         assertEquals(-1, response.headers.contentLength)
+    }
+
+    @Test
+    fun `resumable downloads are streamed whole from the start`() {
+        val game = testGame(title = "Celeste")
+        val data = mockk<InputStream>(relaxed = true)
+        val offsets = mutableListOf<Long>()
+        every { catalog.gameEntity("10") } returns game
+        every { downloads.getProviders() } returns listOf(provider())
+        every { downloads.getDownload(any(), any()) } returns
+                ResumableFileDownload("zip", 42, "v1") { offset -> offsets += offset; data }
+        every { downloads.processDownload(any(), any(), any(), any(), any(), any()) } just runs
+        val request = MockHttpServletRequest().apply { addHeader(HttpHeaders.RANGE, "bytes=10-") }
+
+        val response = controller.download("10", "direct", request)
+
+        assertEquals(200, response.statusCode.value())
+        assertEquals(42, response.headers.contentLength)
+        assertEquals("Celeste.zip", response.headers.contentDisposition.filename)
+        assertNull(response.headers.getFirst(HttpHeaders.CONTENT_RANGE))
+        assertEquals(listOf(0L), offsets)
+        (response.body as StreamingResponseBody).writeTo(ByteArrayOutputStream())
+        verify { downloads.processDownload(data, any(), game, "api-key:cred", "api:cred", any()) }
     }
 
     @Test

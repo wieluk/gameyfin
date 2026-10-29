@@ -10,19 +10,26 @@ import org.gameyfin.app.games.entities.Game
 import org.gameyfin.app.games.entities.GameMetadata
 import org.gameyfin.pluginapi.download.FileDownload
 import org.gameyfin.pluginapi.download.LinkDownload
+import org.gameyfin.pluginapi.download.ResumableFileDownload
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.context.request.async.DeferredResult
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DownloadEndpointTest {
@@ -435,6 +442,110 @@ class DownloadEndpointTest {
         assertTrue(annotations.any { it.annotationClass.simpleName == "RequestMapping" })
         assertTrue(annotations.any { it.annotationClass.simpleName == "DynamicPublicAccess" })
         assertTrue(annotations.any { it.annotationClass.simpleName == "AnonymousAllowed" })
+    }
+
+    private val content = "0123456789".toByteArray()
+
+    private fun resumableGame(range: String?, ifRange: String? = null): Game {
+        val game = createTestGame(1L, "Test Game", "/path/to/game", fileSize = content.size.toLong())
+        val download = ResumableFileDownload("zip", content.size.toLong(), "v1") { offset ->
+            ByteArrayInputStream(content, offset.toInt(), content.size - offset.toInt())
+        }
+
+        mockkStatic("org.gameyfin.app.core.UtilsKt")
+        every { request.getRemoteIp(any()) } returns "192.168.1.1"
+        mockkStatic("org.gameyfin.app.core.security.SecurityUtilsKt")
+        every { getCurrentAuth() } returns null
+
+        every { request.getHeader(HttpHeaders.RANGE) } returns range
+        every { request.getHeader(HttpHeaders.IF_RANGE) } returns ifRange
+        every { gameService.getById(1L) } returns game
+        every { downloadService.getDownload("/path/to/game", "TestProvider") } returns download
+        return game
+    }
+
+    /** What the endpoint hands to the bandwidth-tracked copy. */
+    private fun sentBytes(response: ResponseEntity<StreamingResponseBody>): ByteArray {
+        val sent = slot<InputStream>()
+        every { downloadService.processDownload(capture(sent), any(), any(), any(), any(), any()) } answers {
+            sent.captured.copyTo(secondArg())
+        }
+        return ByteArrayOutputStream().also { response.body!!.writeTo(it) }.toByteArray()
+    }
+
+    @Test
+    fun `a resumable download advertises ranges and counts once`() {
+        val game = resumableGame(range = null)
+
+        val response = awaitDeferredResult(endpoint.downloadGame(1L, "TestProvider", request))
+
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertEquals("bytes", response.headers.getFirst(HttpHeaders.ACCEPT_RANGES))
+        assertEquals("\"v1\"", response.headers.eTag)
+        assertEquals(10L, response.headers.contentLength)
+        assertContentEquals(content, sentBytes(response))
+        verify(exactly = 1) { gameService.incrementDownloadCount(game) }
+    }
+
+    @Test
+    fun `a range request continues from the offset without counting again`() {
+        val game = resumableGame(range = "bytes=4-", ifRange = "\"v1\"")
+
+        val response = awaitDeferredResult(endpoint.downloadGame(1L, "TestProvider", request))
+
+        assertEquals(HttpStatus.PARTIAL_CONTENT, response.statusCode)
+        assertEquals("bytes 4-9/10", response.headers.getFirst(HttpHeaders.CONTENT_RANGE))
+        assertEquals(6L, response.headers.contentLength)
+        assertContentEquals("456789".toByteArray(), sentBytes(response))
+        verify(exactly = 0) { gameService.incrementDownloadCount(game) }
+    }
+
+    @Test
+    fun `a closed range stops at its end`() {
+        resumableGame(range = "bytes=2-4")
+
+        val response = awaitDeferredResult(endpoint.downloadGame(1L, "TestProvider", request))
+
+        assertEquals(HttpStatus.PARTIAL_CONTENT, response.statusCode)
+        assertContentEquals("234".toByteArray(), sentBytes(response))
+    }
+
+    @Test
+    fun `a changed file is sent whole despite the range`() {
+        val game = resumableGame(range = "bytes=4-", ifRange = "\"v0\"")
+
+        val response = awaitDeferredResult(endpoint.downloadGame(1L, "TestProvider", request))
+
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertContentEquals(content, sentBytes(response))
+        verify(exactly = 1) { gameService.incrementDownloadCount(game) }
+    }
+
+    @Test
+    fun `a range past the end is refused`() {
+        resumableGame(range = "bytes=10-")
+
+        val response = awaitDeferredResult(endpoint.downloadGame(1L, "TestProvider", request))
+
+        assertEquals(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE, response.statusCode)
+        assertEquals("bytes */10", response.headers.getFirst(HttpHeaders.CONTENT_RANGE))
+        assertNull(response.body)
+    }
+
+    @Test
+    fun `a plain download ignores the range`() {
+        val game = createTestGame(1L, "Test Game", "/path/to/game", fileSize = 10L)
+        mockkStatic("org.gameyfin.app.core.UtilsKt")
+        every { request.getRemoteIp(any()) } returns "192.168.1.1"
+        every { request.getHeader(HttpHeaders.RANGE) } returns "bytes=4-"
+        every { gameService.getById(1L) } returns game
+        every { downloadService.getDownload("/path/to/game", "TestProvider") } returns
+                FileDownload(ByteArrayInputStream(content), "zip", 10L)
+
+        val response = awaitDeferredResult(endpoint.downloadGame(1L, "TestProvider", request))
+
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertFalse(response.headers.containsHeader(HttpHeaders.ACCEPT_RANGES))
     }
 
     private fun createTestGame(id: Long, title: String, path: String, fileSize: Long?): Game {

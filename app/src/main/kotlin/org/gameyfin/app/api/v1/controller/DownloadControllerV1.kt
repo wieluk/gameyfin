@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import jakarta.servlet.http.HttpServletRequest
 import org.gameyfin.app.api.security.ApiAccess
+import org.gameyfin.app.api.security.ApiPrincipal
 import org.gameyfin.app.api.security.ApiScope
 import org.gameyfin.app.api.v1.apiId
 import org.gameyfin.app.api.v1.dto.DownloadLinkV1
@@ -17,9 +18,11 @@ import org.gameyfin.app.core.LookupPolicy
 import org.gameyfin.app.core.download.files.DownloadService
 import org.gameyfin.app.core.getRemoteIp
 import org.gameyfin.app.games.GameService
+import org.gameyfin.app.games.entities.Game
 import org.gameyfin.app.media.ImageService
 import org.gameyfin.pluginapi.download.FileDownload
 import org.gameyfin.pluginapi.download.LinkDownload
+import org.gameyfin.pluginapi.download.ResumableFileDownload
 import org.springframework.core.io.FileSystemResource
 import org.springframework.core.io.Resource
 import org.springframework.http.*
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.context.request.WebRequest
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 
@@ -72,40 +76,40 @@ class DownloadControllerV1(
         require(downloads.getProviders().any { it.key == provider }) { "Unknown download provider" }
         val ip = request.getRemoteIp(LookupPolicy.IPV4_PREFERRED)
         return when (val download = downloads.getDownload(game.metadata.path, provider)) {
-            is FileDownload -> {
-                try {
-                    games.incrementDownloadCount(game)
-                    val safeTitle =
-                        game.title.orEmpty().replace(Regex("[\\\\/:*?\"<>|\\r\\n]"), "").ifBlank { "download" }
-                    val filename = safeTitle + (download.fileExtension?.let { ".$it" } ?: "")
-                    val response = ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-                        .cacheControl(CacheControl.noStore())
-                        .header(
-                            HttpHeaders.CONTENT_DISPOSITION,
-                            ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build()
-                                .toString()
-                        )
-                    download.size?.let { response.contentLength(it) }
-                    response.body(StreamingResponseBody { output ->
-                        downloads.processDownload(
-                            download.data,
-                            output,
-                            game,
-                            actor.name,
-                            "api:${actor.credentialId}",
-                            ip
-                        )
-                    })
-                } catch (error: Exception) {
-                    download.data.close(); throw error
-                }
-            }
+            is FileDownload -> stream(game, actor, ip, download.data, download.fileExtension, download.size)
+            // Served whole: this API does not answer range requests.
+            is ResumableFileDownload ->
+                stream(game, actor, ip, download.open(0), download.fileExtension, download.size)
 
             is LinkDownload -> {
                 games.incrementDownloadCount(game)
                 ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_JSON)
                     .body(DownloadLinkV1(url = download.url))
             }
+        }
+    }
+
+    private fun stream(
+        game: Game, actor: ApiPrincipal, ip: String, data: InputStream, fileExtension: String?, size: Long?
+    ): ResponseEntity<*> {
+        try {
+            games.incrementDownloadCount(game)
+            val safeTitle =
+                game.title.orEmpty().replace(Regex("[\\\\/:*?\"<>|\\r\\n]"), "").ifBlank { "download" }
+            val filename = safeTitle + (fileExtension?.let { ".$it" } ?: "")
+            val response = ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .cacheControl(CacheControl.noStore())
+                .header(
+                    HttpHeaders.CONTENT_DISPOSITION,
+                    ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build()
+                        .toString()
+                )
+            size?.let { response.contentLength(it) }
+            return response.body(StreamingResponseBody { output ->
+                downloads.processDownload(data, output, game, actor.name, "api:${actor.credentialId}", ip)
+            })
+        } catch (error: Exception) {
+            data.close(); throw error
         }
     }
 
