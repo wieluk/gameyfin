@@ -36,7 +36,7 @@ class DownloadResponsesTest {
             val output = ByteArrayOutputStream()
             response.body!!.writeTo(output)
             assertEquals(expected, output.toString())
-            assertEquals(1, started)
+            assertEquals(if (start == 0) 1 else 0, started, "only a download from the start counts")
             assertTrue(resource.closed)
         }
     }

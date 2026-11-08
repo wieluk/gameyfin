@@ -168,7 +168,8 @@ class DownloadHttpTest {
                         client.send(HttpRequest.newBuilder(broken).GET().build(), HttpResponse.BodyHandlers.ofByteArray())
                     }
                 }
-                verify(exactly = 8) { games.incrementDownloadCount(game) }
+                // Per path: slow, direct and broken count; the resume does not
+                verify(exactly = 6) { games.incrementDownloadCount(game) }
                 verify(exactly = 2) { service.getDownload(any(), "slow") }
             }
         } finally {

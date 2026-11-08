@@ -97,7 +97,8 @@ internal object DownloadResponses {
                 return builder.build()
             }
             val input = resource.openStream(start, length)
-            onStart()
+            // A resume continues a download already counted
+            if (start == 0L) onStart()
             return builder.body(body(request, { resource.use { input.close() } }) { output ->
                 transfer(input, output)
             })
