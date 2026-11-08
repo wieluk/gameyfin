@@ -30,7 +30,7 @@ class DirectDownloadPlugin(context: PluginContext) : ConfigurableGameyfinPlugin(
             key = "calculateArchiveSize",
             type = Boolean::class.java,
             label = "Calculate folder download size",
-            description = "Scan folders before downloading to show exact size and percentage progress.\nThis can delay startup for large file trees.",
+            description = "Scan folders before downloading to show exact size and percentage progress.\nWithout compression, interrupted folder downloads can then resume.\nThis can delay startup for large file trees.",
             default = false
         ),
         ConfigMetadata(
@@ -55,8 +55,12 @@ class DirectDownloadPlugin(context: PluginContext) : ConfigurableGameyfinPlugin(
             )
             else DownloadMetadata(path.extension, path.fileSize())
 
-        override fun prepareRangeDownload(path: Path): RangeDownload? =
-            if (path.isDirectory()) null else FileRangeDownload(path)
+        // A folder can resume only when its whole layout is known up front, which needs the size scan.
+        override fun prepareRangeDownload(path: Path): RangeDownload? = when {
+            !path.isDirectory() -> FileRangeDownload(path)
+            mode() == CompressionMode.None && calculateSize() -> FolderRangeDownload(path)
+            else -> null
+        }
 
         override fun download(path: Path): Download {
             require(path.exists()) { "Path $path does not exist" }
