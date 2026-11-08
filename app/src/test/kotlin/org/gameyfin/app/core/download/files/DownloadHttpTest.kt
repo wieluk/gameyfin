@@ -313,7 +313,8 @@ class DownloadHttpTest {
                 assertEquals("text/html", browserLink.headers().firstValue("Content-Type").orElseThrow())
                 assertEquals("SAMEORIGIN", browserLink.headers().firstValue("X-Frame-Options").orElseThrow())
                 assertTrue(browserLink.body().contains("href=\"${magnet.replace("&", "&amp;")}\""))
-                verify(exactly = 15) { games.incrementDownloadCount(game) }
+                // Each path resumes once, which does not count again
+                verify(exactly = 13) { games.incrementDownloadCount(game) }
                 verify(exactly = 3) { service.getDownload(any(), "magnet") }
                 verify(exactly = 2) { service.getDownload(any(), "slow") }
             }
