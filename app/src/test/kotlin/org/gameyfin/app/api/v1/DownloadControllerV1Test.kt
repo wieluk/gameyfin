@@ -41,7 +41,7 @@ class DownloadControllerV1Test {
         DownloadProviderDto(key, "Provider $key", priority, "Description $key")
 
     @Test
-    fun `range requests use partial responses and HEAD does not count or stream`() {
+    fun `range requests use partial responses and neither a resume nor HEAD counts or streams`() {
         val game = testGame(title = "Game")
         every { catalog.gameEntity("10") } returns game
         every { downloads.getProviders() } returns listOf(provider())
@@ -62,7 +62,8 @@ class DownloadControllerV1Test {
         assertEquals("56789", output.toString())
         val head = controller.download("10", "direct", MockHttpServletRequest("HEAD", "/"))
         assertNull(head.body)
-        verify(exactly = 1) { games.incrementDownloadCount(game) }
+        // A resume continues a download already counted
+        verify(exactly = 0) { games.incrementDownloadCount(game) }
         verify(exactly = 0) { downloads.getDownload(any(), any()) }
         verify(exactly = 2) { resource.close() }
     }
